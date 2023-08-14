@@ -8,7 +8,7 @@ contract RecoveryTokenTest is Test {
     RecoveryToken public recoveryToken;
 
     function setUp() public {
-        recoveryToken = new RecoveryToken(address(0));
+        recoveryToken = new RecoveryToken(address(0), address(0), 18);
     }
 
     function test_test() public {}
