@@ -20,7 +20,7 @@ import {RecoveryToken} from "./RecoveryToken.sol";
  * deposited (wrapped) in this Recovery contract. It uses a modification of the ERC20 standard (non-transferrable)
  * to do the accounting of deposited Recovery Token Balances.
  */
-contract IRecoveryController is ERC20, Owned {
+contract RecoveryController is ERC20, Owned {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
