@@ -5,9 +5,9 @@
 pragma solidity ^0.8.13;
 
 import {StdStorage, stdStorage} from "../../lib/forge-std/src/Test.sol";
-import {Base_Test, Constants} from "../Base.t.sol";
+import {Integration_Test} from "./Integration.t.sol";
 
-contract RecoveryController_Integration_Test is Base_Test {
+contract RecoveryController_Integration_Test is Integration_Test {
     using stdStorage for StdStorage;
     /* ///////////////////////////////////////////////////////////////
                              VARIABLES
@@ -21,8 +21,8 @@ contract RecoveryController_Integration_Test is Base_Test {
                               SETUP
     /////////////////////////////////////////////////////////////// */
 
-    function setUp() public virtual override(Base_Test) {
-        Base_Test.setUp();
+    function setUp() public virtual override {
+        Integration_Test.setUp();
     }
 
     /* ///////////////////////////////////////////////////////////////

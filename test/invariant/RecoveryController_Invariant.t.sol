@@ -4,11 +4,11 @@
  */
 pragma solidity ^0.8.13;
 
-import {Base_Invariant_Test} from "./Base_Invariant.t.sol";
+import {Invariant_Test} from "./Invariant.t.sol";
 import {RecoveryControllerHandler} from "./handlers/RecoveryControllerHandler.sol";
 
 /// @dev Invariant tests for RecoveryController.
-contract RecoveryController_Invariant_Test is Base_Invariant_Test {
+contract RecoveryController_Invariant_Test is Invariant_Test {
     /*//////////////////////////////////////////////////////////////////////////
                                       VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
@@ -23,7 +23,7 @@ contract RecoveryController_Invariant_Test is Base_Invariant_Test {
                                   SET-UP FUNCTION
     //////////////////////////////////////////////////////////////////////////*/
     function setUp() public virtual override {
-        Base_Invariant_Test.setUp();
+        Invariant_Test.setUp();
         recoveryControllerHandler = new RecoveryControllerHandler();
         // We only want to target function calls inside the FactoryHandler contract
         targetContract(address(recoveryControllerHandler));
