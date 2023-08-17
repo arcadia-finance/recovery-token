@@ -8,6 +8,7 @@ import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 
 struct Users {
     address payable creator;
+    address payable owner;
     address payable tokenCreator;
     address payable aggrievedUser0;
     address payable aggrievedUser1;

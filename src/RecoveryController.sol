@@ -45,7 +45,7 @@ contract RecoveryController is ERC20, Owned {
     mapping(address => uint256) public recovered;
 
     // The (unwrapped) Recovery Token contract.
-    RecoveryToken internal immutable recoveryToken;
+    RecoveryToken public immutable recoveryToken;
 
     /*//////////////////////////////////////////////////////////////
                                ERRORS
@@ -61,7 +61,7 @@ contract RecoveryController is ERC20, Owned {
      * @dev Throws if the contract is not active.
      */
     modifier isActive() {
-        require(active, "NOT ACTIVE");
+        require(active, "NOT_ACTIVE");
 
         _;
     }
@@ -70,7 +70,7 @@ contract RecoveryController is ERC20, Owned {
      * @dev Throws if the contract is active.
      */
     modifier notActive() {
-        require(!active, "NOT ACTIVE");
+        require(!active, "ACTIVE");
 
         _;
     }
@@ -89,6 +89,14 @@ contract RecoveryController is ERC20, Owned {
         underlying = underlying_;
         unit = 10 ** decimals;
         recoveryToken = new RecoveryToken(msg.sender, address(this), decimals);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ACTIVATION LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function activate() external onlyOwner {
+        active = true;
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -5,4 +5,6 @@
 pragma solidity ^0.8.13;
 
 /// @notice Abstract contract containing all the errors emitted by the protocol.
-abstract contract Errors {}
+abstract contract Errors {
+    error NotAllowed();
+}

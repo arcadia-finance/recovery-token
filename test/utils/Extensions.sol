@@ -10,8 +10,8 @@ import {RecoveryToken} from "../../src/RecoveryToken.sol";
 contract RecoveryControllerExtension is RecoveryController {
     constructor(address underlying_) RecoveryController(underlying_) {}
 
-    function getRecoveryToken() public view returns (address recoveryToken_) {
-        recoveryToken_ = address(recoveryToken);
+    function getUnderlying() public view returns (address underlying_) {
+        underlying_ = address(underlying);
     }
 }
 
