@@ -60,6 +60,31 @@ contract RecoveryController_Integration_Test is Integration_Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        ACTIVATION LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function testFuzz_Revert_activate_(address unprivilegedAddress) public {
+        // Given: Caller is not the "owner".
+        vm.assume(unprivilegedAddress != users.owner);
+
+        // When: "unprivilegedAddress" calls "activate".
+        // Then: Transaction should revert with "UNAUTHORIZED".
+        vm.prank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        recoveryController.activate();
+    }
+
+    function test_activate() public {
+        // Given:
+        // When: "unprivilegedAddress" calls "activate".
+        vm.prank(users.owner);
+        recoveryController.activate();
+
+        // Then "RecoveryController" is active.
+        assertTrue(recoveryController.active());
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                ERC20 LOGIC
     //////////////////////////////////////////////////////////////*/
 

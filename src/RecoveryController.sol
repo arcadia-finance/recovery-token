@@ -95,6 +95,11 @@ contract RecoveryController is ERC20, Owned {
                         ACTIVATION LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @notice Sets contract to active.
+     * @dev After the contract is active, token holders can withdraw, deposit and interact with the contract,
+     * and no new recoveryTokens can be minted.
+     */
     function activate() external onlyOwner {
         active = true;
     }
