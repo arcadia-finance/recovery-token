@@ -13,6 +13,18 @@ contract RecoveryControllerExtension is RecoveryController {
     function getUnderlying() public view returns (address underlying_) {
         underlying_ = address(underlying);
     }
+
+    function distributeUnderlying(uint256 amount) public {
+        _distributeUnderlying(amount);
+    }
+
+    function getRedeemablePerRTokenLast(address tokenHolder) public view returns (uint256 redeemablePerRTokenLast_) {
+        redeemablePerRTokenLast_ = redeemablePerRTokenLast[tokenHolder];
+    }
+
+    function setRedeemablePerRTokenLast(address tokenHolder, uint256 redeemablePerRTokenLast_) public {
+        redeemablePerRTokenLast[tokenHolder] = redeemablePerRTokenLast_;
+    }
 }
 
 contract RecoveryTokenExtension is RecoveryToken {
