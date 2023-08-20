@@ -329,7 +329,7 @@ contract RecoveryController is ERC20, Owned {
                 _distributeUnderlying(surplus);
             } else {
                 // All positions are recovered, send any remaining funds back to owner.
-                ERC20(underlying).safeTransfer(owner, ERC20(underlying).balanceOf(address(this))-redeemable);
+                ERC20(underlying).safeTransfer(owner, ERC20(underlying).balanceOf(address(this)) - redeemable);
             }
         } else {
             // Update accounting for total redeemed Underlying Tokens.

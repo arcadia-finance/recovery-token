@@ -25,6 +25,10 @@ contract RecoveryControllerExtension is RecoveryController {
     function setRedeemablePerRTokenLast(address tokenHolder, uint256 redeemablePerRTokenLast_) public {
         redeemablePerRTokenLast[tokenHolder] = redeemablePerRTokenLast_;
     }
+
+    function setActive(bool active_) public {
+        active = active_;
+    }
 }
 
 contract RecoveryTokenExtension is RecoveryToken {

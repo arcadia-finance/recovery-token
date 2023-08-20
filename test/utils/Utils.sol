@@ -4,8 +4,9 @@
  */
 pragma solidity ^0.8.13;
 
-/// @notice Abstract contract containing all the errors emitted by the protocol.
 abstract contract Utils {
+    mapping(address => bool) seen;
+
     function castArrayFixedToDynamic(address[2] calldata fixedSizedArray)
         public
         pure
@@ -38,5 +39,21 @@ abstract contract Utils {
                 ++i;
             }
         }
+    }
+
+    function uniqueAddresses(address[] memory addressesArray) public returns (bool) {
+        uint256 length = addressesArray.length;
+        for (uint256 i; i < length;) {
+            if (seen[addressesArray[i]]) {
+                return false;
+            } else {
+                seen[addressesArray[i]] = true;
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+        return true;
     }
 }

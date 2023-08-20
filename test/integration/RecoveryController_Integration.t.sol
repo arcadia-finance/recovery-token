@@ -18,28 +18,110 @@ contract RecoveryController_Integration_Test is Integration_Test {
                             TEST CONTRACTS
     /////////////////////////////////////////////////////////////// */
 
-    /*////////////////////////////////////////////////////////////////
-                    MODIFIERS GIVEN STATEMENTS
-    /////////////////////////////////////////////////////////////// */
-
-    modifier givenCallerIs(address caller) {
-        vm.startPrank(caller);
-        _;
-        vm.stopPrank();
-    }
-
-    modifier givenRecoveryControllerIsActive() {
-        vm.prank(users.owner);
-        recoveryController.activate();
-        _;
-    }
-
     /* ///////////////////////////////////////////////////////////////
                               SETUP
     /////////////////////////////////////////////////////////////// */
 
     function setUp() public virtual override {
         Integration_Test.setUp();
+    }
+
+    /* ///////////////////////////////////////////////////////////////
+                        HELPER FUNCTIONS
+    /////////////////////////////////////////////////////////////// */
+
+    struct UserState {
+        address addr;
+        uint256 redeemed;
+        uint256 redeemablePerRTokenLast;
+        uint256 balanceWRT;
+        uint256 balanceRT;
+        uint256 balanceUT;
+    }
+
+    struct ControllerState {
+        bool active;
+        uint256 redeemablePerRTokenGlobal;
+        uint256 supplyWRT;
+        uint256 balanceRT;
+        uint256 balanceUT;
+    }
+
+    function givenValidActiveState(UserState memory user, ControllerState memory controller)
+        public
+        view
+        returns (UserState memory, ControllerState memory)
+    {
+        // Test-Case: Active
+        controller.active = true;
+
+        // Invariant: "redeemablePerRTokenLast" is smaller or equal as "redeemablePerRTokenGlobal" (Invariant).
+        user.redeemablePerRTokenLast = bound(user.redeemablePerRTokenLast, 0, controller.redeemablePerRTokenGlobal);
+        // Overflow: "redeemable" does not overflow (unrealistic big variables).
+        if (user.redeemablePerRTokenLast != controller.redeemablePerRTokenGlobal) {
+            user.balanceWRT = bound(
+                user.balanceWRT,
+                0,
+                type(uint256).max / (controller.redeemablePerRTokenGlobal - user.redeemablePerRTokenLast)
+            );
+        }
+        // Invariant: "redeemed" is smaller or equal as "userBalanceWRT".
+        user.redeemed = bound(user.redeemed, 0, user.balanceWRT);
+
+        (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
+
+        // Overflow: balance of "user" for "underlyingToken" after redemption (unrealistic big variables).
+        user.balanceUT =
+            bound(user.balanceUT, 0, type(uint256).max - (redeemable < openPosition ? redeemable : openPosition));
+
+        // Invariant: Balance "controllerBalanceRT" of "recoveryController" for "recoveryToken" is greater or equal as "openPosition".
+        controller.balanceRT = bound(controller.balanceRT, openPosition, type(uint256).max);
+
+        // Invariant: Balance "controllerBalanceUT" of "recoveryController" for "underlyingToken" is greater or equal as "redeemable".
+        controller.balanceUT = bound(controller.balanceUT, redeemable, type(uint256).max);
+
+        return (user, controller);
+    }
+
+    function setUserState(UserState memory user) public {
+        // Set redeemed tokens.
+        stdstore.target(address(recoveryController)).sig(recoveryController.redeemed.selector).with_key(user.addr)
+            .checked_write(user.redeemed);
+
+        // Set redeemablePerRTokenLast of last interaction user.
+        recoveryController.setRedeemablePerRTokenLast(user.addr, user.redeemablePerRTokenLast);
+
+        // Set token balances.
+        deal(address(wrappedRecoveryToken), user.addr, user.balanceWRT);
+        deal(address(recoveryToken), user.addr, user.balanceRT);
+        deal(address(underlyingToken), user.addr, user.balanceUT);
+    }
+
+    function setControllerState(ControllerState memory controller) public {
+        // Set activation.
+        recoveryController.setActive(controller.active);
+
+        // Set latest "redeemablePerRTokenGlobal".
+        stdstore.target(address(recoveryController)).sig(recoveryController.redeemablePerRTokenGlobal.selector)
+            .checked_write(controller.redeemablePerRTokenGlobal);
+
+        // Set "totalSupply" of "wrappedRecoveryToken"
+        stdstore.target(address(wrappedRecoveryToken)).sig(wrappedRecoveryToken.totalSupply.selector).checked_write(
+            controller.supplyWRT
+        );
+
+        // Set token balances.
+        deal(address(recoveryToken), address(recoveryController), controller.balanceRT);
+        deal(address(underlyingToken), address(recoveryController), controller.balanceUT);
+    }
+
+    function calculateRedeemableAndOpenAmount(UserState memory user, ControllerState memory controller)
+        public
+        pure
+        returns (uint256 redeemable, uint256 openPosition)
+    {
+        redeemable = user.balanceWRT * (controller.redeemablePerRTokenGlobal - user.redeemablePerRTokenLast) / 10e18;
+        openPosition = user.balanceWRT - user.redeemed;
     }
 
     /* ///////////////////////////////////////////////////////////////
@@ -217,6 +299,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         address[] memory tos_ = castArrayFixedToDynamic(tos);
         uint256[] memory initialBalanceTos_ = castArrayFixedToDynamic(initialBalanceTos);
         uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
+        vm.assume(uniqueAddresses(tos_));
 
         // Given: "RecoveryController" is not active.
         // And: Balances do not overflow after mint.
@@ -308,6 +391,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         address[] memory froms_ = castArrayFixedToDynamic(froms);
         uint256[] memory initialBalanceFroms_ = castArrayFixedToDynamic(initialBalanceFroms);
         uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
+        vm.assume(uniqueAddresses(froms_));
 
         // Given: "RecoveryController" is not active.
         // And: Each "amounts[i]" is smaller or equal to "initialBalanceFroms[i]".
@@ -345,20 +429,20 @@ contract RecoveryController_Integration_Test is Integration_Test {
                         RECOVERY TOKEN LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function testFuzz_distributeUnderlying(uint256 redeemablePerRTokenGlobal, uint256 amount, uint256 totalSupply)
+    function testFuzz_distributeUnderlying(uint256 redeemablePerRTokenGlobal, uint256 amount, uint256 supplyWRT)
         public
     {
-        // Given: totalSupply is non-zero.
-        vm.assume(totalSupply > 0);
+        // Given: supplyWRT is non-zero.
+        vm.assume(supplyWRT > 0);
         // And: New redeemablePerRTokenGlobal does not overflow.
         amount = bound(amount, 0, type(uint256).max / 10e18);
-        uint256 delta = amount * 10e18 / totalSupply;
+        uint256 delta = amount * 10e18 / supplyWRT;
         redeemablePerRTokenGlobal = bound(redeemablePerRTokenGlobal, 0, type(uint256).max - delta);
         // Set variables.
         stdstore.target(address(recoveryController)).sig(recoveryController.redeemablePerRTokenGlobal.selector)
             .checked_write(redeemablePerRTokenGlobal);
         stdstore.target(address(recoveryController)).sig(recoveryController.totalSupply.selector).checked_write(
-            totalSupply
+            supplyWRT
         );
 
         // When: "amount" of "underlyingToken" is distributed.
@@ -372,26 +456,27 @@ contract RecoveryController_Integration_Test is Integration_Test {
         address aggrievedUser,
         uint256 redeemablePerRTokenGlobal,
         uint256 redeemablePerRTokenLast,
-        uint256 balanceOf,
+        uint256 userBalanceWRT,
         uint256 redeemed
     ) public {
         // Given: "redeemablePerRTokenLast" is smaller or equal as "redeemablePerRTokenGlobal" (Invariant).
         redeemablePerRTokenLast = bound(redeemablePerRTokenLast, 0, redeemablePerRTokenGlobal);
         // And: "redeemable" does not overflow.
         if (redeemablePerRTokenLast != redeemablePerRTokenGlobal) {
-            balanceOf = bound(balanceOf, 0, type(uint256).max / (redeemablePerRTokenGlobal - redeemablePerRTokenLast));
+            userBalanceWRT =
+                bound(userBalanceWRT, 0, type(uint256).max / (redeemablePerRTokenGlobal - redeemablePerRTokenLast));
         }
-        // And: "redeemed" is smaller or equal as "balanceOf" (Invariant).
-        redeemed = bound(redeemed, 0, balanceOf);
+        // And: "redeemed" is smaller or equal as "userBalanceWRT" (Invariant).
+        redeemed = bound(redeemed, 0, userBalanceWRT);
         // And: The position is not fully covered.
-        uint256 redeemable = balanceOf * (redeemablePerRTokenGlobal - redeemablePerRTokenLast) / 10e18;
-        uint256 openPosition = balanceOf - redeemed;
+        uint256 redeemable = userBalanceWRT * (redeemablePerRTokenGlobal - redeemablePerRTokenLast) / 10e18;
+        uint256 openPosition = userBalanceWRT - redeemed;
         vm.assume(openPosition > redeemable);
         // Set variables.
         stdstore.target(address(recoveryController)).sig(recoveryController.redeemablePerRTokenGlobal.selector)
             .checked_write(redeemablePerRTokenGlobal);
         stdstore.target(address(recoveryController)).sig(recoveryController.balanceOf.selector).with_key(aggrievedUser)
-            .checked_write(balanceOf);
+            .checked_write(userBalanceWRT);
         stdstore.target(address(recoveryController)).sig(recoveryController.redeemed.selector).with_key(aggrievedUser)
             .checked_write(redeemed);
         recoveryController.setRedeemablePerRTokenLast(aggrievedUser, redeemablePerRTokenLast);
@@ -407,26 +492,27 @@ contract RecoveryController_Integration_Test is Integration_Test {
         address aggrievedUser,
         uint256 redeemablePerRTokenGlobal,
         uint256 redeemablePerRTokenLast,
-        uint256 balanceOf,
+        uint256 userBalanceWRT,
         uint256 redeemed
     ) public {
         // Given: "redeemablePerRTokenLast" is smaller or equal as "redeemablePerRTokenGlobal" (Invariant).
         redeemablePerRTokenLast = bound(redeemablePerRTokenLast, 0, redeemablePerRTokenGlobal);
         // And: "redeemable" does not overflow.
         if (redeemablePerRTokenLast != redeemablePerRTokenGlobal) {
-            balanceOf = bound(balanceOf, 0, type(uint256).max / (redeemablePerRTokenGlobal - redeemablePerRTokenLast));
+            userBalanceWRT =
+                bound(userBalanceWRT, 0, type(uint256).max / (redeemablePerRTokenGlobal - redeemablePerRTokenLast));
         }
-        // And: "redeemed" is smaller or equal as "balanceOf" (Invariant).
-        redeemed = bound(redeemed, 0, balanceOf);
+        // And: "redeemed" is smaller or equal as "userBalanceWRT" (Invariant).
+        redeemed = bound(redeemed, 0, userBalanceWRT);
         // And: The position is fully covered.
-        uint256 redeemable = balanceOf * (redeemablePerRTokenGlobal - redeemablePerRTokenLast) / 10e18;
-        uint256 openPosition = balanceOf - redeemed;
+        uint256 redeemable = userBalanceWRT * (redeemablePerRTokenGlobal - redeemablePerRTokenLast) / 10e18;
+        uint256 openPosition = userBalanceWRT - redeemed;
         vm.assume(openPosition <= redeemable);
         // Set variables.
         stdstore.target(address(recoveryController)).sig(recoveryController.redeemablePerRTokenGlobal.selector)
             .checked_write(redeemablePerRTokenGlobal);
         stdstore.target(address(recoveryController)).sig(recoveryController.balanceOf.selector).with_key(aggrievedUser)
-            .checked_write(balanceOf);
+            .checked_write(userBalanceWRT);
         stdstore.target(address(recoveryController)).sig(recoveryController.redeemed.selector).with_key(aggrievedUser)
             .checked_write(redeemed);
         recoveryController.setRedeemablePerRTokenLast(aggrievedUser, redeemablePerRTokenLast);
@@ -452,23 +538,23 @@ contract RecoveryController_Integration_Test is Integration_Test {
         address depositor,
         address aggrievedUser,
         uint256 amount,
-        uint256 totalSupply,
+        uint256 supplyWRT,
         uint256 redeemablePerRTokenGlobal
     ) public {
-        // Given: totalSupply is non-zero.
-        vm.assume(totalSupply > 0);
+        // Given: supplyWRT is non-zero.
+        vm.assume(supplyWRT > 0);
         // And: New redeemablePerRTokenGlobal does not overflow.
         amount = bound(amount, 0, type(uint256).max / 10e18);
-        uint256 delta = amount * 10e18 / totalSupply;
+        uint256 delta = amount * 10e18 / supplyWRT;
         redeemablePerRTokenGlobal = bound(redeemablePerRTokenGlobal, 0, type(uint256).max - delta);
         // And: "redeemable" does not overflow.
         if (delta > 0) {
-            vm.assume(totalSupply <= type(uint256).max / (redeemablePerRTokenGlobal + delta));
+            vm.assume(supplyWRT <= type(uint256).max / (redeemablePerRTokenGlobal + delta));
         }
 
         // Given: one "aggrievedUser" holds the total supply and has nothing redeemed.
         vm.prank(users.owner);
-        recoveryController.mint(aggrievedUser, totalSupply);
+        recoveryController.mint(aggrievedUser, supplyWRT);
         // Set state variables.
         stdstore.target(address(recoveryController)).sig(recoveryController.redeemablePerRTokenGlobal.selector)
             .checked_write(redeemablePerRTokenGlobal);
@@ -490,7 +576,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // And: The "amount" is redeemable by "aggrievedUser".
         uint256 redeemable = recoveryController.previewRedeemable(aggrievedUser);
-        uint256 maxRoundingError = totalSupply / 10e18 + 1;
+        uint256 maxRoundingError = supplyWRT / 10e18 + 1;
         uint256 lowerBound = maxRoundingError < amount ? amount - maxRoundingError : 0;
         assertLe(lowerBound, redeemable);
         assertLe(redeemable, amount);
@@ -508,230 +594,130 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
     function testFuzz_redeemUnderlying_NonRecoveredPosition(
         address caller,
-        address aggrievedUser,
-        uint256 redeemablePerRTokenGlobal,
-        uint256 redeemablePerRTokenLast,
-        uint256 balanceOf,
-        uint256 redeemed,
-        uint256 initialRTokenController,
-        uint256 initialUTokenController
+        UserState memory user,
+        ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(aggrievedUser != address(recoveryController));
+        vm.assume(user.addr != address(recoveryController));
 
-        // Given: "redeemablePerRTokenLast" is smaller or equal as "redeemablePerRTokenGlobal" (Invariant).
-        redeemablePerRTokenLast = bound(redeemablePerRTokenLast, 0, redeemablePerRTokenGlobal);
-        // And: "redeemable" does not overflow.
-        if (redeemablePerRTokenLast != redeemablePerRTokenGlobal) {
-            balanceOf = bound(balanceOf, 0, type(uint256).max / (redeemablePerRTokenGlobal - redeemablePerRTokenLast));
-        }
-        // And: "redeemed" is smaller or equal as "balanceOf" (Invariant).
-        redeemed = bound(redeemed, 0, balanceOf);
-        // And: The position is not fully covered.
-        uint256 redeemable = balanceOf * (redeemablePerRTokenGlobal - redeemablePerRTokenLast) / 10e18;
-        uint256 openPosition = balanceOf - redeemed;
+        // And: The protocol is active with a random valid state.
+        (user, controller) = givenValidActiveState(user, controller);
+
+        // And: The position is not fully covered (test-condition NonRecoveredPosition).
+        uint256 redeemable =
+            user.balanceWRT * (controller.redeemablePerRTokenGlobal - user.redeemablePerRTokenLast) / 10e18;
+        uint256 openPosition = user.balanceWRT - user.redeemed;
         vm.assume(openPosition > redeemable);
-        // Set variables.
-        stdstore.target(address(recoveryController)).sig(recoveryController.redeemablePerRTokenGlobal.selector)
-            .checked_write(redeemablePerRTokenGlobal);
-        deal(address(wrappedRecoveryToken), aggrievedUser, balanceOf);
-        stdstore.target(address(recoveryController)).sig(recoveryController.redeemed.selector).with_key(aggrievedUser)
-            .checked_write(redeemed);
-        recoveryController.setRedeemablePerRTokenLast(aggrievedUser, redeemablePerRTokenLast);
 
-        // Given: Balance "initialRTokenController" of "recoveryController" for "recoveryToken" is greater or equal as "openPosition" (Invariant).
-        initialRTokenController = bound(initialRTokenController, openPosition, type(uint256).max);
-        deal(address(recoveryToken), address(recoveryController), initialRTokenController);
-        // And: Balance "initialUTokenController" of "recoveryController" for "underlyingToken" is greater or equal as "redeemable" (Invariant).
-        initialUTokenController = bound(initialUTokenController, redeemable, type(uint256).max);
-        deal(address(underlyingToken), address(recoveryController), initialUTokenController);
-
-        // Given: "RecoveryController" is active.
-        vm.prank(users.owner);
-        recoveryController.activate();
+        // And: State is persisted.
+        setUserState(user);
+        setControllerState(controller);
 
         // When: "caller" calls "redeemUnderlying" for "aggrievedUser".
         vm.prank(caller);
-        recoveryController.redeemUnderlying(aggrievedUser);
+        recoveryController.redeemUnderlying(user.addr);
 
         // Then: "aggrievedUser" state variables are updated.
-        assertEq(recoveryController.redeemed(aggrievedUser), redeemed + redeemable);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(aggrievedUser), redeemablePerRTokenGlobal);
-        // And: "recoveryToken" balance of "recoveryController" decreases with "redeemable".
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), initialRTokenController - redeemable);
-        // And: "underlyingToken" balance of "recoveryController" decreases with "redeemable".
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), initialUTokenController - redeemable);
-        // And: "underlyingToken" balance of "aggrievedUser" increases with "redeemable".
-        assertEq(underlyingToken.balanceOf(aggrievedUser), redeemable);
+        assertEq(recoveryController.redeemed(user.addr), user.redeemed + redeemable);
+        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal);
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + redeemable);
+
+        // And: "controller" state variables are updated.
+        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - redeemable);
+        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - redeemable);
     }
 
     function testFuzz_redeemUnderlying_FullyRecoveredPosition_LastPosition(
         address caller,
-        address aggrievedUser,
-        uint256 redeemablePerRTokenGlobal,
-        uint256 redeemablePerRTokenLast,
-        uint256 balanceOf,
-        uint256 redeemed,
-        uint256 initialRTokenController,
-        uint256 initialUTokenController
+        UserState memory user,
+        ControllerState memory controller
     ) public {
-        caller = address(0);
-        aggrievedUser = address(0);
-        redeemablePerRTokenGlobal = 0;
-        redeemablePerRTokenLast = 0;
-        balanceOf = 0;
-        redeemed = 0;
-        initialRTokenController = 10000;
-        initialUTokenController = 10000;
         // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(aggrievedUser != address(recoveryController));
+        vm.assume(user.addr != address(recoveryController));
 
-        // Given: "redeemablePerRTokenLast" is smaller or equal as "redeemablePerRTokenGlobal" (Invariant).
-        redeemablePerRTokenLast = bound(redeemablePerRTokenLast, 0, redeemablePerRTokenGlobal);
-        // And: "redeemable" does not overflow.
-        if (redeemablePerRTokenLast != redeemablePerRTokenGlobal) {
-            balanceOf = bound(balanceOf, 0, type(uint256).max / (redeemablePerRTokenGlobal - redeemablePerRTokenLast));
-        }
-        // And: "redeemed" is smaller as "balanceOf" (Invariant).
-        redeemed = bound(redeemed, 0, balanceOf);
-        // And: The position is not fully covered.
-        uint256 redeemable = balanceOf * (redeemablePerRTokenGlobal - redeemablePerRTokenLast) / 10e18;
-        uint256 openPosition = balanceOf - redeemed;
+        // And: The protocol is active with a random valid state.
+        (user, controller) = givenValidActiveState(user, controller);
+
+        // And: The position is fully covered (test-condition NonRecoveredPosition).
+        (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
         vm.assume(openPosition <= redeemable);
-        // And: "surplus_" does not overflow.
-        if (redeemed > 0) vm.assume(redeemable <= type(uint256).max / redeemed);
-        // Set variables.
-        stdstore.target(address(recoveryController)).sig(recoveryController.redeemablePerRTokenGlobal.selector)
-            .checked_write(redeemablePerRTokenGlobal);
-        deal(address(wrappedRecoveryToken), aggrievedUser, balanceOf);
-        stdstore.target(address(wrappedRecoveryToken)).sig(recoveryController.totalSupply.selector)
-            .checked_write(balanceOf);
-        emit log_named_uint("totalsupply1", wrappedRecoveryToken.totalSupply());
-        stdstore.target(address(recoveryController)).sig(recoveryController.redeemed.selector).with_key(aggrievedUser)
-            .checked_write(redeemed);
-        recoveryController.setRedeemablePerRTokenLast(aggrievedUser, redeemablePerRTokenLast);
 
-        // Given: Balance "initialRTokenController" of "recoveryController" for "recoveryToken" is greater or equal as "openPosition" (Invariant).
-        initialRTokenController = bound(initialRTokenController, openPosition, type(uint256).max);
-        deal(address(recoveryToken), address(recoveryController), initialRTokenController);
-        // And: Balance "initialUTokenController" of "recoveryController" for "underlyingToken" is greater or equal as "redeemable" (Invariant).
-        initialUTokenController = bound(initialUTokenController, redeemable, type(uint256).max);
-        deal(address(underlyingToken), address(recoveryController), initialUTokenController);
+        // And: "totalSupply" equals the balance of the user (test-condition LastPosition).
+        controller.supplyWRT = user.balanceWRT;
 
-        // Given: "RecoveryController" is active.
-        vm.prank(users.owner);
-        recoveryController.activate();
+        // And: Assume "surplus" does not overflow (unrealistic big numbers).
+        vm.assume(redeemable <= type(uint256).max - user.redeemed);
 
-        emit log_named_uint("totalsupply2", wrappedRecoveryToken.totalSupply());
-        emit log_named_uint("openPosition", openPosition);
-        emit log_named_uint("redeemable", redeemable);
-        emit log_named_uint("balanceOf", balanceOf);
-        emit log_named_uint("initialRTokenController", initialRTokenController);
-        emit log_named_uint("initialUTokenController", initialUTokenController);
+        // And: State is persisted.
+        setUserState(user);
+        setControllerState(controller);
+
         // When: "caller" calls "redeemUnderlying" for "aggrievedUser".
         vm.prank(caller);
-        recoveryController.redeemUnderlying(aggrievedUser);
+        recoveryController.redeemUnderlying(user.addr);
 
         // Then: "aggrievedUser" position is closed.
-        assertEq(wrappedRecoveryToken.balanceOf(aggrievedUser), 0);
-        assertEq(recoveryController.redeemed(aggrievedUser), 0);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(aggrievedUser), 0);
-        // And: "recoveryToken" balance of "recoveryController" decreases with "openPosition".
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), initialRTokenController - openPosition);
-        // And: "underlyingToken" balance of "recoveryController" is zero.
+        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(recoveryController.redeemed(user.addr), 0);
+        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        // And: "aggrievedUser" token balances are updated.
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
+
+        // And: "controller" state variables are updated.
+        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - openPosition);
         assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
-        // And: "underlyingToken" balance of "aggrievedUser" increases with "openPosition".
-        assertEq(underlyingToken.balanceOf(aggrievedUser), openPosition);
+
         // And: "underlyingToken" balance of "owner" increases with remaining funds.
-        assertEq(underlyingToken.balanceOf(users.owner), initialUTokenController - openPosition);
+        assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - openPosition);
     }
 
     function testFuzz_redeemUnderlying_FullyRecoveredPosition_NotLastPosition(
         address caller,
-        address aggrievedUser,
-        uint256 redeemablePerRTokenGlobal,
-        uint256 redeemablePerRTokenLast,
-        uint256 balanceOf,
-        uint256 redeemed,
-        uint256 initialRTokenController,
-        uint256 initialUTokenController
+        UserState memory user,
+        ControllerState memory controller
     ) public {
-        caller = address(0);
-        aggrievedUser = address(0);
-        redeemablePerRTokenGlobal = 1442371705343219403799901934176946609368877262062;
-        redeemablePerRTokenLast = 59758143550363524431507393256326614911;
-        balanceOf = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
-        redeemed = 0;
-        initialRTokenController = 1361129467683753853853498429727072845823;
-        initialUTokenController = 115792089237316195423570985008687907853269984665640564039457584007913129639934;
-
         // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(aggrievedUser != address(recoveryController));
+        vm.assume(user.addr != address(recoveryController));
 
-        // ToDo: Properly avoid overflow due to _distributeUnderlying()
-        redeemablePerRTokenGlobal = bound(redeemablePerRTokenGlobal, 0, type(uint256).max / 10e25);
+        // And: The protocol is active with a random valid state.
+        (user, controller) = givenValidActiveState(user, controller);
 
-        // Given: "redeemablePerRTokenLast" is smaller or equal as "redeemablePerRTokenGlobal" (Invariant).
-        redeemablePerRTokenLast = bound(redeemablePerRTokenLast, 0, redeemablePerRTokenGlobal);
-        // And: "redeemable" does not overflow.
-        if (redeemablePerRTokenLast != redeemablePerRTokenGlobal) {
-            balanceOf = bound(balanceOf, 0, type(uint256).max / (redeemablePerRTokenGlobal - redeemablePerRTokenLast));
-        }
-        // And: "redeemed" is smaller as "balanceOf" (Invariant).
-        redeemed = bound(redeemed, 0, balanceOf);
-        // And: The position is not fully covered.
-        uint256 redeemable = balanceOf * (redeemablePerRTokenGlobal - redeemablePerRTokenLast) / 10e18;
-        uint256 openPosition = balanceOf - redeemed;
+        // And: The position is fully covered (test-case).
+        (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
         vm.assume(openPosition <= redeemable);
-        // And: "surplus_" does not overflow.
-        if (redeemed > 0) vm.assume(redeemable <= type(uint256).max / redeemed);
-        // ToDo: And: _distributeUnderlying() does not overflow.
-        uint256 surplus = 
 
-        // Set variables.
-        stdstore.target(address(recoveryController)).sig(recoveryController.redeemablePerRTokenGlobal.selector)
-            .checked_write(redeemablePerRTokenGlobal);
-        deal(address(wrappedRecoveryToken), aggrievedUser, balanceOf);
-        // totalSupply bigger as balanceOf.
-        // ToDo: fuzz totalSupply.
-        stdstore.target(address(wrappedRecoveryToken)).sig(recoveryController.totalSupply.selector)
-            .checked_write(balanceOf + 1);
-        emit log_named_uint("totalsupply1", wrappedRecoveryToken.totalSupply());
-        stdstore.target(address(recoveryController)).sig(recoveryController.redeemed.selector).with_key(aggrievedUser)
-            .checked_write(redeemed);
-        recoveryController.setRedeemablePerRTokenLast(aggrievedUser, redeemablePerRTokenLast);
+        // And: "totalSupply" is strictly bigger as the balance of the user (test-condition NotLastPosition).
+        vm.assume(user.balanceWRT < type(uint256).max);
+        controller.supplyWRT = bound(controller.supplyWRT, user.balanceWRT + 1, type(uint256).max);
 
-        // Given: Balance "initialRTokenController" of "recoveryController" for "recoveryToken" is greater or equal as "openPosition" (Invariant).
-        initialRTokenController = bound(initialRTokenController, openPosition, type(uint256).max);
-        deal(address(recoveryToken), address(recoveryController), initialRTokenController);
-        // And: Balance "initialUTokenController" of "recoveryController" for "underlyingToken" is greater or equal as "redeemable" (Invariant).
-        initialUTokenController = bound(initialUTokenController, redeemable, type(uint256).max);
-        deal(address(underlyingToken), address(recoveryController), initialUTokenController);
+        // And: Assume "surplus" does not overflow (unrealistic big numbers).
+        vm.assume(redeemable <= type(uint256).max - user.redeemed);
+        uint256 surplus = user.redeemed + redeemable - user.balanceWRT;
+        // And: Assume "delta" does not overflow (unrealistic big numbers).
+        vm.assume(surplus <= type(uint256).max / 10e18);
+        uint256 delta = surplus * 10e18 / (controller.supplyWRT - user.balanceWRT);
+        // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
+        vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
 
-        // Given: "RecoveryController" is active.
-        vm.prank(users.owner);
-        recoveryController.activate();
+        // And: State is persisted.
+        setUserState(user);
+        setControllerState(controller);
 
-        emit log_named_uint("totalsupply2", wrappedRecoveryToken.totalSupply());
-        emit log_named_uint("openPosition", openPosition);
-        emit log_named_uint("redeemable", redeemable);
-        emit log_named_uint("balanceOf", balanceOf);
-        emit log_named_uint("initialRTokenController", initialRTokenController);
-        emit log_named_uint("initialUTokenController", initialUTokenController);
         // When: "caller" calls "redeemUnderlying" for "aggrievedUser".
         vm.prank(caller);
-        recoveryController.redeemUnderlying(aggrievedUser);
+        recoveryController.redeemUnderlying(user.addr);
 
         // Then: "aggrievedUser" position is closed.
-        assertEq(wrappedRecoveryToken.balanceOf(aggrievedUser), 0);
-        assertEq(recoveryController.redeemed(aggrievedUser), 0);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(aggrievedUser), 0);
-        // And: "recoveryToken" balance of "recoveryController" decreases with "openPosition".
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), initialRTokenController - openPosition);
-        // And: "underlyingToken" balance of "recoveryController" decreases with "openPosition".
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), initialUTokenController - openPosition);
-        // And: "underlyingToken" balance of "aggrievedUser" increases with "openPosition".
-        assertEq(underlyingToken.balanceOf(aggrievedUser), openPosition);
+        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(recoveryController.redeemed(user.addr), 0);
+        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        // And: "aggrievedUser" token balances are updated.
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
+
+        // And: "controller" state variables are updated.
+        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - openPosition);
+        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - openPosition);
+
         // And: "underlyingToken" balance of "owner" is zero.
         assertEq(underlyingToken.balanceOf(users.owner), 0);
     }
