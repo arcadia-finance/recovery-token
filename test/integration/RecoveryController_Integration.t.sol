@@ -5,6 +5,8 @@
 pragma solidity ^0.8.13;
 
 import {StdStorage, stdStorage} from "../../lib/forge-std/src/Test.sol";
+import {stdError} from "../../lib/forge-std/src/StdError.sol";
+
 import {Integration_Test} from "./Integration.t.sol";
 import {RecoveryControllerExtension} from "../utils/Extensions.sol";
 
@@ -71,14 +73,17 @@ contract RecoveryController_Integration_Test is Integration_Test {
         (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
 
         // Overflow: balance of "user" for "underlyingToken" after redemption (unrealistic big variables).
-        user.balanceUT =
-            bound(user.balanceUT, 0, type(uint256).max - (redeemable < openPosition ? redeemable : openPosition));
+        user.balanceUT = bound(user.balanceUT, 0, type(uint256).max - redeemable);
+        user.balanceUT = bound(user.balanceUT, 0, type(uint256).max - openPosition);
 
-        // Invariant: Balance "controllerBalanceRT" of "recoveryController" for "recoveryToken" is greater or equal as "openPosition".
+        // Invariant: "recoveryToken" balance of the "controller" is greater or equal as "openPosition" of any user.
         controller.balanceRT = bound(controller.balanceRT, openPosition, type(uint256).max);
 
-        // Invariant: Balance "controllerBalanceUT" of "recoveryController" for "underlyingToken" is greater or equal as "redeemable".
+        // Invariant: "underlyingToken" balance of the "controller" is greater or equal as "redeemable" of any user.
         controller.balanceUT = bound(controller.balanceUT, redeemable, type(uint256).max);
+
+        // Invariant ERC20: no "wrappedRecoveryToken" balance can exceed its totalSupply.
+        controller.supplyWRT = bound(controller.supplyWRT, user.balanceWRT, type(uint256).max);
 
         return (user, controller);
     }
@@ -122,6 +127,28 @@ contract RecoveryController_Integration_Test is Integration_Test {
     {
         redeemable = user.balanceWRT * (controller.redeemablePerRTokenGlobal - user.redeemablePerRTokenLast) / 10e18;
         openPosition = user.balanceWRT - user.redeemed;
+    }
+
+    function givenValidDepositAmount(
+        uint256 amount,
+        uint256 minAmount,
+        uint256 maxAmount,
+        UserState memory user,
+        ControllerState memory controller
+    ) public view returns (uint256) {
+        // And: "amount" is smaller or equal as "user.balanceRT" (underflow, see testFuzz_Revert_depositRecoveryTokens_InsufficientBalance).
+        vm.assume(user.balanceRT >= minAmount);
+        amount = bound(amount, minAmount, user.balanceRT);
+        // And: "amount" does not overflow "totalSupply" (unrealistic big values).
+        vm.assume(controller.supplyWRT <= type(uint256).max - minAmount);
+        amount = bound(amount, minAmount, type(uint256).max - controller.supplyWRT);
+        // And: "amount" does not overflow "controller.balanceRT" (unrealistic big values).
+        vm.assume(controller.balanceRT <= type(uint256).max - minAmount);
+        amount = bound(amount, minAmount, type(uint256).max - controller.balanceRT);
+        // And: "amount" is smaller or equal as "maxAmount"
+        amount = bound(amount, minAmount, maxAmount);
+
+        return amount;
     }
 
     /* ///////////////////////////////////////////////////////////////
@@ -177,7 +204,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         deal(address(recoveryController), aggrievedUser, initialBalance);
 
         // When: "aggrievedUser" transfers "amount" to "to".
-        // Then: Transaction should revert with "arithmeticError".
+        // Then: Transaction should revert with "NotAllowed".
         vm.prank(aggrievedUser);
         vm.expectRevert(NotAllowed.selector);
         recoveryController.transfer(to, amount);
@@ -198,7 +225,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryController.approve(caller, allowance);
 
         // When: "caller" transfers "amount" from "aggrievedUser" to "to".
-        // Then: Transaction should revert with "arithmeticError".
+        // Then: Transaction should revert with "NotAllowed".
         vm.prank(caller);
         vm.expectRevert(NotAllowed.selector);
         recoveryController.transferFrom(aggrievedUser, to, amount);
@@ -604,9 +631,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         (user, controller) = givenValidActiveState(user, controller);
 
         // And: The position is not fully covered (test-condition NonRecoveredPosition).
-        uint256 redeemable =
-            user.balanceWRT * (controller.redeemablePerRTokenGlobal - user.redeemablePerRTokenLast) / 10e18;
-        uint256 openPosition = user.balanceWRT - user.redeemed;
+        (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
         vm.assume(openPosition > redeemable);
 
         // And: State is persisted.
@@ -660,7 +685,6 @@ contract RecoveryController_Integration_Test is Integration_Test {
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
         assertEq(recoveryController.redeemed(user.addr), 0);
         assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
-        // And: "aggrievedUser" token balances are updated.
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
 
         // And: "controller" state variables are updated.
@@ -719,6 +743,244 @@ contract RecoveryController_Integration_Test is Integration_Test {
         assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - openPosition);
 
         // And: "underlyingToken" balance of "owner" is zero.
+        assertEq(underlyingToken.balanceOf(users.owner), 0);
+    }
+
+    function testFuzz_Revert_depositRecoveryTokens_NotActive(address aggrievedUser, uint256 amount) public {
+        // Given: "RecoveryController" is not active.
+
+        // When: "aggrievedUser" calls "depositRecoveryTokens" with "amount".
+        // Then: Transaction reverts with "NOT_ACTIVE".
+        vm.prank(aggrievedUser);
+        vm.expectRevert("NOT_ACTIVE");
+        recoveryController.depositRecoveryTokens(amount);
+    }
+
+    function testFuzz_Revert_depositRecoveryTokens_ZeroAmount(address aggrievedUser) public {
+        // Given: "RecoveryController" is active.
+        recoveryController.setActive(true);
+
+        // When: "aggrievedUser" calls "depositRecoveryTokens" with 0 amount.
+        // Then: Transaction reverts with "DRT: ZERO_AMOUNT".
+        vm.prank(aggrievedUser);
+        vm.expectRevert("DRT: ZERO_AMOUNT");
+        recoveryController.depositRecoveryTokens(0);
+    }
+
+    function testFuzz_Revert_depositRecoveryTokens_InsufficientBalance(uint256 amount, UserState memory user) public {
+        // Given: "RecoveryController" is active.
+        recoveryController.setActive(true);
+        // And: "amount" is strictly bigger as "user.balanceRT".
+        user.balanceRT = bound(user.balanceRT, 0, type(uint256).max - 1);
+        amount = bound(amount, user.balanceRT + 1, type(uint256).max);
+
+        // When: "aggrievedUser" calls "depositRecoveryTokens" with "amount".
+        // Then: Transaction reverts with "arithmeticError".
+        vm.prank(user.addr);
+        vm.expectRevert(stdError.arithmeticError);
+        recoveryController.depositRecoveryTokens(amount);
+    }
+
+    function testFuzz_depositRecoveryTokens_NoInitialPosition(
+        uint256 amount,
+        UserState memory user,
+        ControllerState memory controller
+    ) public {
+        // Given: The protocol is active with a random valid state.
+        (user, controller) = givenValidActiveState(user, controller);
+
+        // And: "user" has no initial position. (test-condition NoInitialPosition)
+        user.balanceWRT = 0;
+        user.redeemablePerRTokenLast = 0;
+        user.redeemed = 0;
+
+        // And: Amount is strictly greater as zero (zero amount reverts see: testFuzz_Revert_depositRecoveryTokens_ZeroAmount).
+        uint256 minAmount = 1;
+        // And: "amount" does not revert/overflow.
+        amount = givenValidDepositAmount(amount, minAmount, type(uint256).max, user, controller);
+
+        // And: State is persisted.
+        setUserState(user);
+        setControllerState(controller);
+
+        // And: "user" has approved "recoveryController" with at least "amount".
+        vm.prank(user.addr);
+        recoveryToken.approve(address(recoveryController), amount);
+
+        // When: "aggrievedUser" calls "recoveryToken".
+        vm.prank(user.addr);
+        recoveryController.depositRecoveryTokens(amount);
+
+        // Then: "aggrievedUser" state variables are updated.
+        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal);
+        assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT - amount);
+        assertEq(wrappedRecoveryToken.balanceOf(user.addr), amount);
+
+        // And: "controller" state variables are updated.
+        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT + amount);
+        assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT + amount);
+    }
+
+    function testFuzz_depositRecoveryTokens_WithInitialPosition_NonRecoveredPosition(
+        uint256 amount,
+        UserState memory user,
+        ControllerState memory controller
+    ) public {
+        // Given: The protocol is active with a random valid state.
+        (user, controller) = givenValidActiveState(user, controller);
+
+        // And: "user" has initial position. (test-condition InitialPosition)
+        vm.assume(user.balanceWRT > 0);
+
+        // And: Amount is strictly greater as zero (zero amount reverts see: testFuzz_Revert_depositRecoveryTokens_ZeroAmount).
+        // And: Amount The position is not fully covered (test-condition NonRecoveredPosition).
+        // -> "openPosition + amount" is strictly greater as "redeemable".
+        (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
+        uint256 minAmount = (openPosition <= redeemable) ? (redeemable - openPosition + 1) : 1;
+        // And: "amount" does not revert/overflow.
+        amount = givenValidDepositAmount(amount, minAmount, type(uint256).max, user, controller);
+
+        // And: State is persisted.
+        setUserState(user);
+        setControllerState(controller);
+
+        // And: "user" has approved "recoveryController" with at least "amount".
+        vm.prank(user.addr);
+        recoveryToken.approve(address(recoveryController), amount);
+
+        // When: "aggrievedUser" calls "recoveryToken".
+        vm.prank(user.addr);
+        recoveryController.depositRecoveryTokens(amount);
+
+        // Then: "aggrievedUser" state variables are updated.
+        assertEq(wrappedRecoveryToken.balanceOf(user.addr), user.balanceWRT + amount);
+        assertEq(recoveryController.redeemed(user.addr), user.redeemed + redeemable);
+        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal);
+        assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT - amount);
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + redeemable);
+
+        // And: "controller" state variables are updated.
+        assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT + amount);
+        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT + amount - redeemable);
+        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - redeemable);
+    }
+
+    function testFuzz_depositRecoveryTokens_WithInitialPosition_FullyRecoveredPosition_LastPosition(
+        uint256 amount,
+        UserState memory user,
+        ControllerState memory controller
+    ) public {
+        // Given: The protocol is active with a random valid state.
+        (user, controller) = givenValidActiveState(user, controller);
+
+        // And: "user" has initial position. (test-condition InitialPosition)
+        vm.assume(user.balanceWRT > 0);
+
+        // And: Amount is strictly greater as zero (zero amount reverts see: testFuzz_Revert_depositRecoveryTokens_ZeroAmount).
+        uint256 minAmount = 1;
+        // And: Amount The position is fully covered (test-condition NonRecoveredPosition).
+        // -> "openPosition + amount" is smaller or equal as "redeemable".
+        (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
+        vm.assume(openPosition <= type(uint256).max - minAmount);
+        vm.assume(openPosition + minAmount <= redeemable);
+        uint256 maxAmount = redeemable - openPosition;
+        // And: "amount" does not revert/overflow.
+        amount = givenValidDepositAmount(amount, minAmount, maxAmount, user, controller);
+
+        // And: "totalSupply" equals the balance of the user (test-condition LastPosition).
+        controller.supplyWRT = user.balanceWRT;
+
+        // And: Assume "surplus" does not overflow (unrealistic big numbers).
+        vm.assume(redeemable <= type(uint256).max - user.redeemed);
+
+        // And: State is persisted.
+        setUserState(user);
+        setControllerState(controller);
+
+        // And: "user" has approved "recoveryController" with at least "amount".
+        vm.prank(user.addr);
+        recoveryToken.approve(address(recoveryController), amount);
+
+        // When: "aggrievedUser" calls "recoveryToken".
+        vm.prank(user.addr);
+        recoveryController.depositRecoveryTokens(amount);
+
+        // Then: "aggrievedUser" position is closed.
+        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(recoveryController.redeemed(user.addr), 0);
+        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT - amount);
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
+
+        // And: "controller" state variables are updated.
+        assertEq(wrappedRecoveryToken.totalSupply(), 0);
+        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT + amount - openPosition);
+        assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
+
+        // And: "underlyingToken" balance of "owner" increases with remaining funds.
+        assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - openPosition);
+    }
+
+    function testFuzz_depositRecoveryTokens_WithInitialPosition_FullyRecoveredPosition_NotLastPosition(
+        uint256 amount,
+        UserState memory user,
+        ControllerState memory controller
+    ) public {
+        // Given: The protocol is active with a random valid state.
+        (user, controller) = givenValidActiveState(user, controller);
+
+        // And: "user" has initial position. (test-condition InitialPosition)
+        vm.assume(user.balanceWRT > 0);
+
+        // And: Amount is strictly greater as zero (zero amount reverts see: testFuzz_Revert_depositRecoveryTokens_ZeroAmount).
+        uint256 minAmount = 1;
+        // And: Amount The position is fully covered (test-condition NonRecoveredPosition).
+        // -> "openPosition + amount" is smaller or equal as "redeemable".
+        (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
+        vm.assume(openPosition <= type(uint256).max - minAmount);
+        vm.assume(openPosition + minAmount <= redeemable);
+        uint256 maxAmount = redeemable - openPosition;
+        // And: "amount" does not revert/overflow.
+        amount = givenValidDepositAmount(amount, minAmount, maxAmount, user, controller);
+
+        // And: "totalSupply" is strictly bigger as the balance of the user (test-condition NotLastPosition).
+        vm.assume(user.balanceWRT < type(uint256).max);
+        controller.supplyWRT = bound(controller.supplyWRT, user.balanceWRT + 1, type(uint256).max);
+
+        // And: Assume "surplus" does not overflow (unrealistic big numbers).
+        vm.assume(redeemable <= type(uint256).max - user.redeemed);
+        uint256 surplus = user.redeemed + redeemable - user.balanceWRT;
+        // And: Assume "delta" does not overflow (unrealistic big numbers).
+        vm.assume(surplus <= type(uint256).max / 10e18);
+        uint256 delta = surplus * 10e18 / (controller.supplyWRT - user.balanceWRT);
+        // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
+        vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
+
+        // And: State is persisted.
+        setUserState(user);
+        setControllerState(controller);
+
+        // And: "user" has approved "recoveryController" with at least "amount".
+        vm.prank(user.addr);
+        recoveryToken.approve(address(recoveryController), amount);
+
+        // When: "aggrievedUser" calls "recoveryToken".
+        vm.prank(user.addr);
+        recoveryController.depositRecoveryTokens(amount);
+
+        // Then: "aggrievedUser" position is closed.
+        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(recoveryController.redeemed(user.addr), 0);
+        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT - amount);
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
+
+        // And: "controller" state variables are updated.
+        assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - user.balanceWRT);
+        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT + amount - openPosition);
+        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - openPosition);
+
+        // And: "underlyingToken" balance of "owner" increases with remaining funds.
         assertEq(underlyingToken.balanceOf(users.owner), 0);
     }
 }

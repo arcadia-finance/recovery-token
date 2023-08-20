@@ -34,9 +34,6 @@ contract RecoveryController is ERC20, Owned {
     // The growth of Underlying Tokens redeemed per Wrapped Recovery Token for the entire life of the contract.
     uint256 public redeemablePerRTokenGlobal;
 
-    // The unit (10^decimals) of the Underlying Token and the Recovery Token.
-    uint256 internal immutable unit;
-
     // The contract address of the Underlying Token.
     address internal immutable underlying;
 
@@ -88,7 +85,6 @@ contract RecoveryController is ERC20, Owned {
         Owned(msg.sender)
     {
         underlying = underlying_;
-        unit = 10 ** decimals;
         recoveryToken = new RecoveryToken(msg.sender, address(this), decimals);
     }
 
@@ -217,21 +213,55 @@ contract RecoveryController is ERC20, Owned {
     }
 
     /**
+     * @notice Redeems Recovery Tokens for Underlying Tokens.
+     * @param owner_ The owner of the wrapped Recovery Tokens.
+     * @dev Everyone can call the redeem function for any address.
+     */
+    function redeemUnderlying(address owner_) external isActive {
+        // Cache token balances.
+        uint256 initialBalance = balanceOf[owner_];
+        uint256 redeemedLast = redeemed[owner_];
+
+        // Calculate the redeemable underlying tokens since the last redemption.
+        uint256 redeemable =
+            initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 10e18);
+
+        if (initialBalance - redeemedLast <= redeemable) {
+            // Updated balance of redeemed Underlying Tokens exceeds the non-redeemed rTokens.
+            // -> Close the position and settle surplus rTokens.
+            _closeRecoveredPosition(owner_);
+            uint256 surplus = redeemedLast + redeemable - initialBalance;
+            redeemable = initialBalance - redeemedLast;
+            _settleSurplus(surplus, redeemable);
+        } else {
+            // Position not fully recovered, update accounting for total redeemed Underlying Tokens.
+            redeemed[owner_] = redeemedLast + redeemable;
+            redeemablePerRTokenLast[owner_] = redeemablePerRTokenGlobal;
+        }
+
+        // Reentrancy: Transfer the Underlying Tokens after logic.
+        _redeemUnderlying(owner_, redeemable);
+    }
+
+    /**
      * @notice Deposits (wraps) Recovery Tokens.
      * @param amount The non-redeemed rTokens deposited.
      * @dev Holders of Recovery Tokens need to deposit the tokens in this contract before
      * they can redeem the Recovery Tokens for redeemed Underlying Tokens.
      */
     function depositRecoveryTokens(uint256 amount) external isActive {
+        require(amount != 0, "DRT: ZERO_AMOUNT");
+
         // Cache token balances.
         uint256 initialBalance = balanceOf[msg.sender];
         uint256 redeemedLast;
         uint256 redeemable;
 
-        // recoveryToken is a trusted contract.
+        // Reentrancy: recoveryToken is a trusted contract without hooks or external calls.
+        // Recovery Tokens need to be transferred to Controller before a position can be closed.
         recoveryToken.transferFrom(msg.sender, address(this), amount);
 
-        if (initialBalance > 0) {
+        if (initialBalance != 0) {
             redeemedLast = redeemed[msg.sender];
             // Calculate the redeemable underlying tokens since the last redemption.
             redeemable =
@@ -239,11 +269,13 @@ contract RecoveryController is ERC20, Owned {
         }
 
         if (initialBalance + amount - redeemedLast <= redeemable) {
-            // Updated balance of redeemed Underlying Tokens exceed the non-redeemed rTokens.
+            // Updated balance of redeemed Underlying Tokens exceeds the non-redeemed rTokens.
             // Close the position and distribute the surplus to other rToken-Holders.
             _closeRecoveredPosition(msg.sender);
             uint256 surplus = redeemedLast + redeemable - initialBalance - amount;
-            _distributeUnderlying(surplus);
+            redeemable = initialBalance - redeemedLast;
+            // Settle surplus to other rToken-Holders or the Protocol Owner.
+            _settleSurplus(surplus, redeemable);
         } else {
             // Update accounting for total redeemed Underlying Tokens.
             redeemed[msg.sender] = redeemedLast + redeemable;
@@ -273,18 +305,19 @@ contract RecoveryController is ERC20, Owned {
             initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[msg.sender], 10e18);
 
         if (initialBalance - redeemedLast <= redeemable) {
-            // Updated balance of redeemed Underlying Tokens, even without withdrawing rTokens,
+            // Updated balance of redeemed Underlying Tokens, even before withdrawing rTokens,
             // exceeds the non-redeemed rTokens.
-            // Close the position, distribute the surplus to other rToken-Holders and no rTokens will be withdrawn.
+            // -> Close the position and settle surplus rTokens.
             _closeRecoveredPosition(msg.sender);
             uint256 surplus = redeemedLast + redeemable - initialBalance;
             redeemable = initialBalance - redeemedLast;
-            _distributeUnderlying(surplus);
+            // Settle surplus to other rToken-Holders or the Protocol Owner.
+            _settleSurplus(surplus, redeemable);
         } else {
             if (initialBalance - redeemedLast <= redeemable + amount) {
-                // Updated balance of redeemed Underlying Tokens would exceed the non-redeemed rTokens
-                // after withdrawing rTokens,.
-                // Close the position, and withdraw the remaining rTokens.
+                // Updated balance of redeemed Underlying Tokens, after withdrawing rTokens
+                // exceeds the non-redeemed rTokens.
+                // -> Close the position and withdraw the remaining rTokens.
                 _closeRecoveredPosition(msg.sender);
                 amount = initialBalance - redeemedLast - redeemable;
             } else {
@@ -302,43 +335,6 @@ contract RecoveryController is ERC20, Owned {
 
         // Reentrancy: Transfer the Underlying Tokens after logic.
         _redeemUnderlying(msg.sender, redeemable);
-    }
-
-    /**
-     * @notice Redeems Recovery Tokens for Underlying Tokens.
-     * @param owner_ The owner of the wrapped Recovery Tokens.
-     * @dev Everyone can call the redeem function for any address.
-     */
-    function redeemUnderlying(address owner_) external isActive {
-        // Cache token balances.
-        uint256 initialBalance = balanceOf[owner_];
-        uint256 redeemedLast = redeemed[owner_];
-
-        // Calculate the redeemable underlying tokens since the last redemption.
-        uint256 redeemable =
-            initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 10e18);
-
-        if (initialBalance - redeemedLast <= redeemable) {
-            // Updated balance of redeemed Underlying Tokens exceed the non-redeemed rTokens.
-            // Close the position.
-            _closeRecoveredPosition(owner_);
-            uint256 surplus = redeemedLast + redeemable - initialBalance;
-            redeemable = initialBalance - redeemedLast;
-            // Distribute the surplus to other rToken-Holders.
-            if (totalSupply != 0) {
-                _distributeUnderlying(surplus);
-            } else {
-                // All positions are recovered, send any remaining funds back to owner.
-                ERC20(underlying).safeTransfer(owner, ERC20(underlying).balanceOf(address(this)) - redeemable);
-            }
-        } else {
-            // Update accounting for total redeemed Underlying Tokens.
-            redeemed[owner_] = redeemedLast + redeemable;
-            redeemablePerRTokenLast[owner_] = redeemablePerRTokenGlobal;
-        }
-
-        // Reentrancy: Transfer the Underlying Tokens after logic.
-        _redeemUnderlying(owner_, redeemable);
     }
 
     /**
@@ -366,6 +362,16 @@ contract RecoveryController is ERC20, Owned {
     }
 
     /**
+     * @notice Logic to close a fully recovered position.
+     * @param owner_ The owner of the fully recovered position.
+     */
+    function _closeRecoveredPosition(address owner_) internal {
+        redeemed[owner_] = 0;
+        redeemablePerRTokenLast[owner_] = 0;
+        _burn(owner_, balanceOf[owner_]);
+    }
+
+    /**
      * @notice Logic to redeem Recovery Tokens for Underlying Tokens.
      * @param to The receiver of the Underlying Tokens.
      * @param amount The amount of tokens redeemed.
@@ -380,13 +386,18 @@ contract RecoveryController is ERC20, Owned {
     }
 
     /**
-     * @notice Logic to close a fully recovered position.
-     * @param owner_ The owner of the fully recovered position.
+     * @notice Logic to settle any surplus Recovery Tokens after a position is closed.
+     * @param surplus The amount of surplus Recovery Tokens.
+     * @param redeemable The amount of Underlying Tokens that are redeemed.
      */
-    function _closeRecoveredPosition(address owner_) internal {
-        redeemed[owner_] = 0;
-        redeemablePerRTokenLast[owner_] = 0;
-        _burn(owner_, balanceOf[owner_]);
+    function _settleSurplus(uint256 surplus, uint256 redeemable) internal {
+        if (totalSupply != 0) {
+            // Not all positions are recovered, distribute the surplus to other rToken-Holders.
+            _distributeUnderlying(surplus);
+        } else {
+            // All positions are recovered, send any remaining Underlying Tokens back to the Protocol Owner.
+            ERC20(underlying).safeTransfer(owner, ERC20(underlying).balanceOf(address(this)) - redeemable);
+        }
     }
 
     /**
