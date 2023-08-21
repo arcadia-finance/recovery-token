@@ -26,7 +26,7 @@ contract RecoveryToken is ERC20, Owned {
     /**
      * @dev Throws if called by any account other than the Recovery Controller.
      */
-    modifier onlyRecoveryController() virtual {
+    modifier onlyRecoveryController() {
         require(msg.sender == recoveryController, "UNAUTHORIZED");
 
         _;
