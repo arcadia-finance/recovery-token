@@ -296,6 +296,8 @@ contract RecoveryController is ERC20, Owned {
      * they can redeem the Recovery Tokens for redeemed Underlying Tokens.
      */
     function withdrawRecoveryTokens(uint256 amount) external isActive {
+        require(amount != 0, "WRT: ZERO_AMOUNT");
+
         // Cache token balances.
         uint256 initialBalance = balanceOf[msg.sender];
         uint256 redeemedLast = redeemed[msg.sender];
@@ -314,7 +316,7 @@ contract RecoveryController is ERC20, Owned {
             // Settle surplus to other rToken-Holders or the Protocol Owner.
             _settleSurplus(surplus, redeemable);
         } else {
-            if (initialBalance - redeemedLast <= redeemable + amount) {
+            if (initialBalance - redeemedLast - redeemable <= amount) {
                 // Updated balance of redeemed Underlying Tokens, after withdrawing rTokens
                 // exceeds the non-redeemed rTokens.
                 // -> Close the position and withdraw the remaining rTokens.
@@ -405,7 +407,7 @@ contract RecoveryController is ERC20, Owned {
      * @param amount The amount of redeemed Underlying Tokens.
      */
     function _distributeUnderlying(uint256 amount) internal {
-        redeemablePerRTokenGlobal += amount.mulDivDown(10e18, totalSupply);
+        if (amount != 0) redeemablePerRTokenGlobal += amount.mulDivDown(10e18, totalSupply);
     }
 
     /*//////////////////////////////////////////////////////////////
