@@ -4,7 +4,8 @@
  */
 pragma solidity ^0.8.13;
 
-import {BaseHandler} from "./BaseHandler.sol";
+import {BaseHandler, SharedHandlerState} from "./BaseHandler.sol";
+import {RecoveryController} from "../../../src/RecoveryController.sol";
 import "../../utils/Constants.sol";
 
 /// @dev This contract and not { Factory } is exposed to Foundry for invariant testing. The point is
@@ -14,8 +15,7 @@ contract RecoveryControllerHandler is BaseHandler {
                                      VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
 
-    // Track number of calls to functions
-    uint256 public callsToSetNewAccountInfo;
+    RecoveryController internal recoveryController;
 
     /*//////////////////////////////////////////////////////////////////////////
                                    TEST CONTRACTS
@@ -25,7 +25,9 @@ contract RecoveryControllerHandler is BaseHandler {
                                     CONSTRUCTOR
     //////////////////////////////////////////////////////////////////////////*/
 
-    constructor() {}
+    constructor(SharedHandlerState state_, RecoveryController recoveryController_) BaseHandler(state_) {
+        recoveryController = recoveryController_;
+    }
 
     /*//////////////////////////////////////////////////////////////////////////
                                     FUNCTIONS

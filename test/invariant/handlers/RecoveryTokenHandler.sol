@@ -4,33 +4,32 @@
  */
 pragma solidity ^0.8.13;
 
-import {Invariant_Test} from "./Invariant.t.sol";
-import {RecoveryControllerHandler} from "./handlers/RecoveryControllerHandler.sol";
+import {BaseHandler, SharedHandlerState} from "./BaseHandler.sol";
+import {RecoveryToken} from "../../../src/RecoveryToken.sol";
+import "../../utils/Constants.sol";
 
-/// @dev Invariant tests for RecoveryController.
-contract RecoveryController_Invariant_Test is Invariant_Test {
+/// @dev This contract and not { Factory } is exposed to Foundry for invariant testing. The point is
+/// to bound and restrict the inputs that get passed to the real-world contract to avoid getting reverts.
+contract RecoveryTokenHandler is BaseHandler {
     /*//////////////////////////////////////////////////////////////////////////
-                                      VARIABLES
+                                     VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
 
     /*//////////////////////////////////////////////////////////////////////////
                                    TEST CONTRACTS
     //////////////////////////////////////////////////////////////////////////*/
 
-    RecoveryControllerHandler internal recoveryControllerHandler;
+    RecoveryToken internal recoveryToken;
 
     /*//////////////////////////////////////////////////////////////////////////
-                                  SET-UP FUNCTION
+                                    CONSTRUCTOR
     //////////////////////////////////////////////////////////////////////////*/
-    function setUp() public virtual override {
-        Invariant_Test.setUp();
-        recoveryControllerHandler = new RecoveryControllerHandler();
-        // We only want to target function calls inside the FactoryHandler contract
-        targetContract(address(recoveryControllerHandler));
+
+    constructor(SharedHandlerState state_, RecoveryToken recoveryToken_) BaseHandler(state_) {
+        recoveryToken = recoveryToken_;
     }
 
     /*//////////////////////////////////////////////////////////////////////////
-                                     INVARIANTS
+                                    FUNCTIONS
     //////////////////////////////////////////////////////////////////////////*/
-    // function invariant_() public {}
 }
