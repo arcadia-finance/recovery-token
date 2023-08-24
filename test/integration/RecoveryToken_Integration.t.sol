@@ -6,8 +6,8 @@ pragma solidity ^0.8.13;
 
 import {StdStorage, stdStorage} from "../../lib/forge-std/src/Test.sol";
 import {stdError} from "../../lib/forge-std/src/StdError.sol";
-import {RecoveryTokenExtension} from "../utils/Extensions.sol";
 import {Integration_Test} from "./Integration.t.sol";
+import {RecoveryTokenExtension} from "../utils/Extensions.sol";
 
 contract RecoveryToken_Integration_Test is Integration_Test {
     using stdStorage for StdStorage;
@@ -19,7 +19,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
                             TEST CONTRACTS
     /////////////////////////////////////////////////////////////// */
 
-    RecoveryTokenExtension internal recoveryToken_;
+    RecoveryTokenExtension internal recoveryTokenExtension;
 
     /* ///////////////////////////////////////////////////////////////
                               SETUP
@@ -28,8 +28,12 @@ contract RecoveryToken_Integration_Test is Integration_Test {
     function setUp() public virtual override {
         Integration_Test.setUp();
 
-        recoveryToken_ =
+        // Deploy Recovery Token contract.
+        recoveryTokenExtension =
             new RecoveryTokenExtension(users.creator, address(recoveryController), underlyingToken.decimals());
+
+        // Label the contract.
+        vm.label({account: address(recoveryToken), newLabel: "RecoveryToken"});
     }
 
     /* ///////////////////////////////////////////////////////////////
@@ -37,11 +41,11 @@ contract RecoveryToken_Integration_Test is Integration_Test {
     /////////////////////////////////////////////////////////////// */
 
     function testFuzz_deployment(address owner_, address recoveryController_, uint8 decimals_) public {
-        recoveryToken_ = new RecoveryTokenExtension(owner_, recoveryController_, decimals_);
+        recoveryTokenExtension = new RecoveryTokenExtension(owner_, recoveryController_, decimals_);
 
-        assertEq(recoveryToken_.owner(), owner_);
-        assertEq(recoveryToken_.getRecoveryController(), recoveryController_);
-        assertEq(recoveryToken_.decimals(), decimals_);
+        assertEq(recoveryTokenExtension.owner(), owner_);
+        assertEq(recoveryTokenExtension.getRecoveryController(), recoveryController_);
+        assertEq(recoveryTokenExtension.decimals(), decimals_);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -56,21 +60,21 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
-        recoveryToken_.mint(amount);
+        recoveryTokenExtension.mint(amount);
     }
 
     function testFuzz_mint(uint256 initialBalance, uint256 amount) public {
         // Given "recoveryController" has "initialBalance" tokens.
-        deal(address(recoveryToken_), address(recoveryController), initialBalance);
+        deal(address(recoveryTokenExtension), address(recoveryController), initialBalance);
         // And: Balance does not overflow after mint.
         vm.assume(amount <= type(uint256).max - initialBalance);
 
         // When: "recoveryController" mints "amount".
         vm.prank(address(recoveryController));
-        recoveryToken_.mint(amount);
+        recoveryTokenExtension.mint(amount);
 
         // Then: Balance of "recoveryController" should increase with "amount".
-        assertEq(recoveryToken_.balanceOf(address(recoveryController)), initialBalance + amount);
+        assertEq(recoveryTokenExtension.balanceOf(address(recoveryController)), initialBalance + amount);
     }
 
     function testFuzz_Revert_burn_1arg_InsufficientBalance(
@@ -79,7 +83,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         uint256 amount
     ) public {
         // Given "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryToken_), aggrievedUser, initialBalance);
+        deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
         // And: "amount" is bigger as "initialBalance".
         vm.assume(amount > initialBalance);
 
@@ -87,21 +91,21 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         // Then: Transaction should revert with "arithmeticError".
         vm.prank(aggrievedUser);
         vm.expectRevert(stdError.arithmeticError);
-        recoveryToken_.burn(amount);
+        recoveryTokenExtension.burn(amount);
     }
 
     function testFuzz_burn_1arg(address aggrievedUser, uint256 initialBalance, uint256 amount) public {
         // Given "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryToken_), aggrievedUser, initialBalance);
+        deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
         // And: "amount" is smaller or equal as "initialBalance".
         vm.assume(amount <= initialBalance);
 
         // When: "aggrievedUser" burns "amount".
         vm.prank(aggrievedUser);
-        recoveryToken_.burn(amount);
+        recoveryTokenExtension.burn(amount);
 
         // Then: Balance of "aggrievedUser" should decrease with "amount".
-        assertEq(recoveryToken_.balanceOf(aggrievedUser), initialBalance - amount);
+        assertEq(recoveryTokenExtension.balanceOf(aggrievedUser), initialBalance - amount);
     }
 
     function testFuzz_Revert_burn_2arg_NonRecoveryController(
@@ -113,13 +117,13 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         // Given: Caller is not the "recoveryController".
         vm.assume(unprivilegedAddress != address(recoveryController));
         // And: "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryToken_), aggrievedUser, initialBalance);
+        deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
 
         // When: "unprivilegedAddress" burns "amount" of "aggrievedUser".
         // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
-        recoveryToken_.burn(aggrievedUser, amount);
+        recoveryTokenExtension.burn(aggrievedUser, amount);
     }
 
     function testFuzz_Revert_burn_2arg_InsufficientBalance(
@@ -128,7 +132,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         uint256 amount
     ) public {
         // Given "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryToken_), aggrievedUser, initialBalance);
+        deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
         // And: "amount" is bigger as "initialBalance".
         vm.assume(amount > initialBalance);
 
@@ -136,20 +140,20 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         // Then: Transaction should revert with "arithmeticError".
         vm.prank(address(recoveryController));
         vm.expectRevert(stdError.arithmeticError);
-        recoveryToken_.burn(aggrievedUser, amount);
+        recoveryTokenExtension.burn(aggrievedUser, amount);
     }
 
     function testFuzz_burn_2arg(address aggrievedUser, uint256 initialBalance, uint256 amount) public {
         // Given "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryToken_), aggrievedUser, initialBalance);
+        deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
         // And: "amount" is smaller or equal as "initialBalance".
         vm.assume(amount <= initialBalance);
 
         // When: "recoveryController" burns "amount" of "aggrievedUser".
         vm.prank(address(recoveryController));
-        recoveryToken_.burn(aggrievedUser, amount);
+        recoveryTokenExtension.burn(aggrievedUser, amount);
 
         // Then: Balance of "aggrievedUser" should decrease with "amount".
-        assertEq(recoveryToken_.balanceOf(aggrievedUser), initialBalance - amount);
+        assertEq(recoveryTokenExtension.balanceOf(aggrievedUser), initialBalance - amount);
     }
 }

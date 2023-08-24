@@ -8,7 +8,9 @@ import {Test} from "../lib/forge-std/src/Test.sol";
 import {Constants} from "./utils/Constants.sol";
 import {Errors} from "./utils/Errors.sol";
 import {Events} from "./utils/Events.sol";
-import {RecoveryControllerExtension} from "./utils/Extensions.sol";
+import {ERC20, ERC20Mock} from "./mocks/ERC20Mock.sol";
+import {RecoveryToken} from "../src/RecoveryToken.sol";
+import {RecoveryController} from "../src/RecoveryController.sol";
 import {Users} from "./utils/Types.sol";
 import {Utils} from "./utils/Utils.sol";
 
@@ -23,6 +25,11 @@ abstract contract Base_Test is Test, Events, Errors, Utils {
     /*//////////////////////////////////////////////////////////////////////////
                                    TEST CONTRACTS
     //////////////////////////////////////////////////////////////////////////*/
+
+    ERC20Mock internal underlyingToken;
+    RecoveryToken internal recoveryToken;
+    RecoveryController internal recoveryController;
+    ERC20 wrappedRecoveryToken;
 
     /*//////////////////////////////////////////////////////////////////////////
                                   SET-UP FUNCTION
@@ -49,6 +56,27 @@ abstract contract Base_Test is Test, Events, Errors, Utils {
         address payable user = payable(makeAddr(name));
         vm.deal({account: user, newBalance: 100 ether});
         return user;
+    }
+
+    function deployUnderlyingAsset() internal {
+        // Deploy mocked Underlying Asset.
+        vm.prank(users.tokenCreator);
+        underlyingToken = new ERC20Mock("Mocked Underlying Token","MUT",8);
+
+        // Label the contract.
+        vm.label({account: address(underlyingToken), newLabel: "UnderlyingToken"});
+    }
+
+    function deployRecoveryContracts() internal {
+        // Deploy Recovery contracts.
+        vm.prank(users.creator);
+        recoveryController = new RecoveryController(address(underlyingToken));
+        wrappedRecoveryToken = ERC20(address(recoveryController));
+        recoveryToken = RecoveryToken(recoveryController.recoveryToken());
+
+        // Label the contracts.
+        vm.label({account: address(recoveryToken), newLabel: "RecoveryToken"});
+        vm.label({account: address(recoveryController), newLabel: "RecoveryController"});
     }
 
     /*//////////////////////////////////////////////////////////////////////////
