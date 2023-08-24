@@ -38,7 +38,8 @@ abstract contract Invariant_Test is Base_Test {
 
         // Deploy handlers.
         recoveryTokenHandler = new RecoveryTokenHandler(state, recoveryToken);
-        recoveryControllerHandler = new RecoveryControllerHandler(state, recoveryController);
+        recoveryControllerHandler =
+            new RecoveryControllerHandler(state, underlyingToken, recoveryToken, recoveryController);
 
         // Target handlers.
         targetContract(address(recoveryTokenHandler));
@@ -49,5 +50,64 @@ abstract contract Invariant_Test is Base_Test {
         excludeSender(address(state));
         excludeSender(address(recoveryTokenHandler));
         excludeSender(address(recoveryControllerHandler));
+    }
+
+    /*//////////////////////////////////////////////////////////////////////////
+                                     INVARIANTS
+    //////////////////////////////////////////////////////////////////////////*/
+
+    function invariant_WrtSupplyEqRtBalanceControllerAndRedeemedAmount() external {
+        uint256 actorsLength = state.getActorsLength();
+        uint256 totalRedeemed;
+        for (uint256 i = 0; i < actorsLength; ++i) {
+            address actor = state.actors(i);
+            totalRedeemed += recoveryController.redeemed(actor);
+        }
+        assertEq(
+            recoveryController.totalSupply(),
+            recoveryToken.balanceOf(address(recoveryController)) + totalRedeemed,
+            unicode"Invariant violation: WRT_supply != RT_balance_controller + Σi(redeemed_i)"
+        );
+    }
+
+    function invariant_WrtBalanceGtRedeemed() external {
+        uint256 actorsLength = state.getActorsLength();
+        for (uint256 i = 0; i < actorsLength; ++i) {
+            address actor = state.actors(i);
+            uint256 wrtBalance = wrappedRecoveryToken.balanceOf(actor);
+            if (wrtBalance > 0) {
+                assertGt(
+                    wrtBalance,
+                    recoveryController.redeemed(actor),
+                    unicode"Invariant violation: ∃i: WRT_balance_i > 0 ∧ WRT_balance_i <= redeemed_i"
+                );
+            }
+        }
+    }
+
+    function invariant_RedeemablePerRTokenGlobalGeRedeemablePerRTokenLast() external {
+        uint256 actorsLength = state.getActorsLength();
+        for (uint256 i = 0; i < actorsLength; ++i) {
+            address actor = state.actors(i);
+            assertGe(
+                recoveryController.redeemablePerRTokenGlobal(),
+                recoveryController.redeemablePerRTokenLast(actor),
+                unicode"Invariant violation: ∃i: RedeemablePerRTokenGlobal < RedeemablePerRTokenLast_i"
+            );
+        }
+    }
+
+    function invariant_UtBalanceControllerGeTotalRedeemable() external {
+        uint256 actorsLength = state.getActorsLength();
+        uint256 totalRedeemable;
+        for (uint256 i = 0; i < actorsLength; ++i) {
+            address actor = state.actors(i);
+            totalRedeemable += recoveryController.previewRedeemable(actor);
+        }
+        assertGe(
+            underlyingToken.balanceOf(address(recoveryController)),
+            totalRedeemable,
+            unicode"Invariant violation: UT_balance_controller < Σi(redeemable_i)"
+        );
     }
 }

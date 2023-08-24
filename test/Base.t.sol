@@ -20,7 +20,7 @@ abstract contract Base_Test is Test, Events, Errors, Utils {
                                      VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
 
-    Users internal users;
+    Users public users;
 
     /*//////////////////////////////////////////////////////////////////////////
                                    TEST CONTRACTS
@@ -29,7 +29,7 @@ abstract contract Base_Test is Test, Events, Errors, Utils {
     ERC20Mock internal underlyingToken;
     RecoveryToken internal recoveryToken;
     RecoveryController internal recoveryController;
-    ERC20 wrappedRecoveryToken;
+    ERC20 internal wrappedRecoveryToken;
 
     /*//////////////////////////////////////////////////////////////////////////
                                   SET-UP FUNCTION
@@ -42,7 +42,9 @@ abstract contract Base_Test is Test, Events, Errors, Utils {
             owner: users.creator,
             tokenCreator: createUser("tokenCreator"),
             aggrievedUser0: createUser("aggrievedUser0"),
-            aggrievedUser1: createUser("aggrievedUser1")
+            aggrievedUser1: createUser("aggrievedUser1"),
+            alice: createUser("alice"),
+            bob: createUser("bob")
         });
         users.owner = users.creator;
     }

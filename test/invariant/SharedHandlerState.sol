@@ -28,4 +28,8 @@ contract SharedHandlerState is StdUtils {
     function getActor(uint256 actorIndexSeed) external view returns (address actor) {
         actor = actors[bound(actorIndexSeed, 0, actors.length - 1)];
     }
+
+    function getActorsLength() public view returns (uint256 actorsLength) {
+        actorsLength = actors.length;
+    }
 }

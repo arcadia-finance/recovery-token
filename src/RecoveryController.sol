@@ -41,7 +41,7 @@ contract RecoveryController is ERC20, Owned {
     address internal immutable underlying;
 
     // Map tokenHolder => Growth of Underlying Tokens redeemed per Wrapped Recovery Token at the owner last interaction.
-    mapping(address => uint256) internal redeemablePerRTokenLast;
+    mapping(address => uint256) public redeemablePerRTokenLast;
     // Map tokenHolder => Amount of Recovery Tokens redeemed for Underlying Tokens.
     mapping(address => uint256) public redeemed;
 
@@ -164,6 +164,7 @@ contract RecoveryController is ERC20, Owned {
         recoveryToken.mint(totalAmount);
     }
 
+    //ToDo: if burn > redeemable, delete entire position.
     /**
      * @notice Burns Wrapped Recovery Tokens.
      * @param from The address from which the tokens are burned.

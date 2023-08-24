@@ -4,12 +4,12 @@
  */
 pragma solidity ^0.8.13;
 
-import {ERC20Mock} from "../mocks/ERC20Mock.sol";
-
 struct Users {
     address payable creator;
     address payable owner;
     address payable tokenCreator;
     address payable aggrievedUser0;
     address payable aggrievedUser1;
+    address payable alice;
+    address payable bob;
 }

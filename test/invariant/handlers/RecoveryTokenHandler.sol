@@ -32,4 +32,23 @@ contract RecoveryTokenHandler is BaseHandler {
     /*//////////////////////////////////////////////////////////////////////////
                                     FUNCTIONS
     //////////////////////////////////////////////////////////////////////////*/
+
+    function transfer(uint256 actorIndexSeed0, uint256 actorIndexSeed1, uint256 amount) external {
+        address from = state.getActor(actorIndexSeed0);
+        address to = state.getActor(actorIndexSeed1);
+
+        amount = bound(amount, 0, recoveryToken.balanceOf(from));
+
+        vm.prank(from);
+        recoveryToken.transfer(to, amount);
+    }
+
+    function burn(uint256 actorIndexSeed, uint256 amount) external {
+        address actor = state.getActor(actorIndexSeed);
+
+        amount = bound(amount, 0, recoveryToken.balanceOf(actor));
+
+        vm.prank(actor);
+        recoveryToken.burn(amount);
+    }
 }
