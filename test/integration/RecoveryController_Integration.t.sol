@@ -7,6 +7,7 @@ pragma solidity ^0.8.13;
 import {StdStorage, stdStorage} from "../../lib/forge-std/src/Test.sol";
 import {stdError} from "../../lib/forge-std/src/StdError.sol";
 import {FixedPointMathLib} from "../../lib/solmate/src/utils/FixedPointMathLib.sol";
+import {UserState, ControllerState} from "../utils/Types.sol";
 import {Integration_Test} from "./Integration.t.sol";
 import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 import {RecoveryToken} from "../../src/RecoveryToken.sol";
@@ -46,23 +47,6 @@ contract RecoveryController_Integration_Test is Integration_Test {
     /* ///////////////////////////////////////////////////////////////
                         HELPER FUNCTIONS
     /////////////////////////////////////////////////////////////// */
-
-    struct UserState {
-        address addr;
-        uint256 redeemed;
-        uint256 redeemablePerRTokenLast;
-        uint256 balanceWRT;
-        uint256 balanceRT;
-        uint256 balanceUT;
-    }
-
-    struct ControllerState {
-        bool active;
-        uint256 redeemablePerRTokenGlobal;
-        uint256 supplyWRT;
-        uint256 balanceRT;
-        uint256 balanceUT;
-    }
 
     function givenValidActiveState(UserState memory user, ControllerState memory controller)
         public
@@ -282,13 +266,13 @@ contract RecoveryController_Integration_Test is Integration_Test {
         public
     {
         // Given: "RecoveryController" is not active.
-        // And: Balance "recoveryControllerExtension" does not overflow after mint of "amount".
+        // And: Balance "recoveryController" does not overflow after mint of "amount".
         vm.assume(amount <= type(uint256).max - initialBalanceController);
         // And: Balance "to" does not overflow after mint of "amount".
         vm.assume(amount <= type(uint256).max - initialBalanceTo);
         // And: "to" has "initialBalanceTo" of "wrappedRecoveryToken".
         deal(address(wrappedRecoveryToken), to, initialBalanceTo);
-        // And: "recoveryControllerExtension" has "initialBalanceController" of "recoveryToken".
+        // And: "recoveryController" has "initialBalanceController" of "recoveryToken".
         deal(address(recoveryToken), address(recoveryControllerExtension), initialBalanceController);
 
         // When: "owner" mints "amount" to "to".
@@ -297,7 +281,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // Then: "wrappedRecoveryToken" balance of "to" should increase with "amount".
         assertEq(wrappedRecoveryToken.balanceOf(to), initialBalanceTo + amount);
-        // And: "recoveryToken" balance of "recoveryControllerExtension" should increase with "amount".
+        // And: "recoveryToken" balance of "recoveryController" should increase with "amount".
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), initialBalanceController + amount);
     }
 
@@ -360,7 +344,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         for (uint256 i; i < tos_.length; ++i) {
             deal(address(wrappedRecoveryToken), tos_[i], initialBalanceTos[i]);
         }
-        // And: "recoveryControllerExtension" has "initialBalanceController" of "recoveryToken".
+        // And: "recoveryController" has "initialBalanceController" of "recoveryToken".
         deal(address(recoveryToken), address(recoveryControllerExtension), initialBalanceController);
 
         // When: "owner" mints "amounts" to "tos".
@@ -371,7 +355,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         for (uint256 i; i < tos_.length; ++i) {
             assertEq(wrappedRecoveryToken.balanceOf(tos_[i]), initialBalanceTos_[i] + amounts_[i]);
         }
-        // And: "recoveryToken" balance of "recoveryControllerExtension" should increase with sum of all "amounts".
+        // And: "recoveryToken" balance of "recoveryController" should increase with sum of all "amounts".
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), expectedBalanceController);
     }
 
@@ -386,27 +370,58 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryControllerExtension.burn(from, amount);
     }
 
-    function testFuzz_burn(address from, uint256 initialBalanceFrom, uint256 initialBalanceController, uint256 amount)
+    function testFuzz_burn_PositionPartiallyClosed(UserState memory user, uint256 amount, uint256 controllerBalanceRT)
         public
     {
-        // Given: "RecoveryController" is not active.
-        // And: "amount" is smaller or equal to "initialBalanceFrom".
-        vm.assume(amount <= initialBalanceFrom);
-        // And: "initialBalanceFrom" is smaller or equal to "initialBalanceController" (Invariant!).
-        vm.assume(initialBalanceFrom <= initialBalanceController);
-        // And: "from" has "initialBalanceFrom" of "wrappedRecoveryToken".
-        deal(address(wrappedRecoveryToken), from, initialBalanceFrom);
-        // And: "recoveryControllerExtension" has "initialBalanceController" of "recoveryToken".
-        deal(address(recoveryToken), address(recoveryControllerExtension), initialBalanceController);
+        // Given: "amount" is strictly smaller as "openPosition" (test-condition PositionPartiallyClosed).
+        // -> userBalanceWRT is also at least 1.
+        user.balanceWRT = bound(user.balanceWRT, 1, type(uint256).max);
+        user.redeemed = bound(user.redeemed, 0, user.balanceWRT - 1); // Invariant.
+        uint256 openPosition = user.balanceWRT - user.redeemed;
+        amount = bound(amount, 0, openPosition - 1);
+
+        // And: "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
+        controllerBalanceRT = bound(controllerBalanceRT, openPosition, type(uint256).max);
+
+        // And: State is persisted.
+        setUserState(user);
+        deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
 
         // When: "owner" burns "amount" from "from".
         vm.prank(users.owner);
-        recoveryControllerExtension.burn(from, amount);
+        recoveryControllerExtension.burn(user.addr, amount);
 
-        // Then: "wrappedRecoveryToken" balance of "from" should decrease with "amount".
-        assertEq(wrappedRecoveryToken.balanceOf(from), initialBalanceFrom - amount);
-        // And: "recoveryToken" balance of "recoveryControllerExtension" should decrease with "amount".
-        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), initialBalanceController - amount);
+        // Then: "wrappedRecoveryToken" balance of "user" should decrease with "amount".
+        assertEq(wrappedRecoveryToken.balanceOf(user.addr), user.balanceWRT - amount);
+        // And: "recoveryToken" balance of "recoveryController" should decrease with "amount".
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - amount);
+    }
+
+    function testFuzz_burn_PositionFullyClosed(UserState memory user, uint256 amount, uint256 controllerBalanceRT)
+        public
+    {
+        // Given: "amount" is greater or equal as "openPosition" (test-condition PositionPartiallyClosed).
+        user.redeemed = bound(user.redeemed, 0, user.balanceWRT); // Invariant.
+        uint256 openPosition = user.balanceWRT - user.redeemed;
+        amount = bound(amount, openPosition, type(uint256).max);
+
+        // And: "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
+        controllerBalanceRT = bound(controllerBalanceRT, openPosition, type(uint256).max);
+
+        // And: State is persisted.
+        setUserState(user);
+        deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
+
+        // When: "owner" burns "amount" from "from".
+        vm.prank(users.owner);
+        recoveryControllerExtension.burn(user.addr, amount);
+
+        // Then: "aggrievedUser" state variables are updated.
+        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
+        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
+        // And: "recoveryToken" balance of "recoveryController" should decrease with "openPosition".
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - openPosition);
     }
 
     function testFuzz_Revert_batchBurn_NonOwner(
@@ -428,48 +443,108 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryControllerExtension.batchBurn(froms_, amounts_);
     }
 
-    function testFuzz_batchBurn(
-        address[2] calldata froms,
-        uint256[2] calldata initialBalanceFroms,
-        uint256 initialBalanceController,
-        uint256[2] calldata amounts
+    function testFuzz_batchBurn_PositionPartiallyClosed(
+        UserState[2] calldata froms,
+        uint256[2] calldata amounts,
+        uint256 controllerBalanceRT
     ) public {
-        // Cast between fixed size arrays and dynamic size array.
-        address[] memory froms_ = castArrayFixedToDynamic(froms);
-        uint256[] memory initialBalanceFroms_ = castArrayFixedToDynamic(initialBalanceFroms);
+        UserState[] memory froms_ = castArrayFixedToDynamicUserState(froms);
         uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
-        vm.assume(uniqueAddresses(froms_));
+        vm.assume(uniqueUsers(froms_));
 
-        // Given: "RecoveryController" is not active.
-        // And: Each "amounts[i]" is smaller or equal to "initialBalanceFroms[i]".
+        // Cache variables.
+        uint256 length = froms_.length;
         uint256 totalAmount;
-        uint256 totalInitialBalanceFrom;
-        for (uint256 i; i < froms_.length; ++i) {
-            vm.assume(amounts[i] <= initialBalanceFroms_[i]);
-            // totalInitialBalanceFrom can't be higher as type(uint256).max.
-            vm.assume(initialBalanceFroms_[i] <= type(uint256).max - totalInitialBalanceFrom);
-            totalInitialBalanceFrom += initialBalanceFroms_[i];
-            totalAmount += amounts[i];
+        uint256 totalOpenPosition;
+        address[] memory fromAddrs = new address[](length);
+
+        // Given: Each "amounts[i]" is strictly smaller as "openPosition[i]" (test-condition PositionPartiallyClosed).
+        // -> Each userBalanceWRT is also at least 1.
+        for (uint256 i; i < length; ++i) {
+            fromAddrs[i] = froms_[i].addr;
+
+            froms_[i].balanceWRT = bound(froms_[i].balanceWRT, 1, type(uint256).max);
+            froms_[i].redeemed = bound(froms_[i].redeemed, 0, froms_[i].balanceWRT - 1); // Invariant.
+            uint256 openPosition = froms_[i].balanceWRT - froms_[i].redeemed;
+            amounts_[i] = bound(amounts_[i], 0, openPosition - 1);
+
+            // totalOpenPosition can't be higher as type(uint256).max.
+            vm.assume(froms_[i].balanceWRT <= type(uint256).max - totalOpenPosition);
+            totalOpenPosition += openPosition;
+            totalAmount += amounts_[i];
         }
-        // And: Total "initialBalanceFroms" is smaller or equal to "initialBalanceController" (Invariant!).
-        vm.assume(totalInitialBalanceFrom <= initialBalanceController);
-        // And: "froms" have "initialBalanceFroms" of "wrappedRecoveryToken".
-        for (uint256 i; i < froms_.length; ++i) {
-            deal(address(wrappedRecoveryToken), froms_[i], initialBalanceFroms_[i]);
+
+        // And: Total "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
+        controllerBalanceRT = bound(controllerBalanceRT, totalOpenPosition, type(uint256).max);
+
+        // And: State is persisted.
+        for (uint256 i; i < length; ++i) {
+            setUserState(froms_[i]);
         }
-        // And: "recoveryControllerExtension" has "initialBalanceController" of "recoveryToken".
-        deal(address(recoveryToken), address(recoveryControllerExtension), initialBalanceController);
+        deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
 
         // When: "owner" burns "amounts" from "froms".
         vm.prank(users.owner);
-        recoveryControllerExtension.batchBurn(froms_, amounts_);
+        recoveryControllerExtension.batchBurn(fromAddrs, amounts_);
 
         // Then: "wrappedRecoveryToken" balance of each "froms[i]" should decrease with "amounts[i]".
         for (uint256 i; i < froms_.length; ++i) {
-            assertEq(wrappedRecoveryToken.balanceOf(froms_[i]), initialBalanceFroms_[i] - amounts_[i]);
+            assertEq(wrappedRecoveryToken.balanceOf(froms_[i].addr), froms_[i].balanceWRT - amounts_[i]);
         }
-        // And: "recoveryToken" balance of "recoveryControllerExtension" should decrease with sum of all "amounts".
-        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), initialBalanceController - totalAmount);
+        // And: "recoveryToken" balance of "recoveryController" should decrease with sum of all "amounts".
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - totalAmount);
+    }
+
+    function testFuzz_batchBurn_PositionFullyClosed(
+        UserState[2] calldata froms,
+        uint256[2] calldata amounts,
+        uint256 controllerBalanceRT
+    ) public {
+        UserState[] memory froms_ = castArrayFixedToDynamicUserState(froms);
+        uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
+        vm.assume(uniqueUsers(froms_));
+
+        // Cache variables.
+        uint256 length = froms_.length;
+        uint256 totalOpenPosition;
+        address[] memory fromAddrs = new address[](length);
+
+        // Given: Each "amounts[i]" is greater or equal as "openPosition[i]" (test-condition PositionPartiallyClosed).
+        // -> Each userBalanceWRT is also at least 1.
+        for (uint256 i; i < length; ++i) {
+            fromAddrs[i] = froms_[i].addr;
+
+            froms_[i].balanceWRT = bound(froms_[i].balanceWRT, 1, type(uint256).max);
+            froms_[i].redeemed = bound(froms_[i].redeemed, 0, froms_[i].balanceWRT - 1); // Invariant.
+            uint256 openPosition = froms_[i].balanceWRT - froms_[i].redeemed;
+            amounts_[i] = bound(amounts_[i], openPosition, type(uint256).max);
+
+            // totalOpenPosition can't be higher as type(uint256).max.
+            vm.assume(froms_[i].balanceWRT <= type(uint256).max - totalOpenPosition);
+            totalOpenPosition += openPosition;
+        }
+
+        // And: Total "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
+        controllerBalanceRT = bound(controllerBalanceRT, totalOpenPosition, type(uint256).max);
+
+        // And: State is persisted.
+        for (uint256 i; i < length; ++i) {
+            setUserState(froms_[i]);
+        }
+        deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
+
+        // When: "owner" burns "amounts" from "froms".
+        vm.prank(users.owner);
+        recoveryControllerExtension.batchBurn(fromAddrs, amounts_);
+
+        // Then: "wrappedRecoveryToken" balance of each "froms[i]" should decrease with "amounts[i]".
+        for (uint256 i; i < froms_.length; ++i) {
+            assertEq(wrappedRecoveryToken.balanceOf(froms_[i].addr), 0);
+            assertEq(recoveryControllerExtension.redeemed(froms_[i].addr), 0);
+            assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(froms_[i].addr), 0);
+        }
+        // And: "recoveryToken" balance of "recoveryController" should decrease with sum of all "openPosition".
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - totalOpenPosition);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -501,13 +576,50 @@ contract RecoveryController_Integration_Test is Integration_Test {
         assertEq(recoveryControllerExtension.redeemablePerRTokenGlobal(), redeemablePerRTokenGlobal + delta);
     }
 
-    function testFuzz_Revert_depositUnderlying_NotActive(address caller, uint256 amount) public {
+    function testFuzz_Revert_depositUnderlying_NotActive(address depositor, uint256 amount) public {
         // Given: "RecoveryController" is not active.
 
-        // When: "caller" calls "redeemUnderlying".
+        // When: A "depositor" deposits "amount" of "underlyingToken".
         // Then: Transaction should revert with "NOT_ACTIVE".
-        vm.prank(caller);
+        vm.prank(depositor);
         vm.expectRevert("NOT_ACTIVE");
+        recoveryControllerExtension.depositUnderlying(amount);
+    }
+
+    function testFuzz_Revert_depositUnderlying_ZeroAmount(address depositor) public {
+        // Given: "RecoveryController" is active.
+        recoveryControllerExtension.setActive(true);
+
+        // When: A "depositor" deposits "amount" of "underlyingToken".
+        // Then: Transaction should revert with "NOT_ACTIVE".
+        vm.prank(depositor);
+        vm.expectRevert("DU: ZERO_AMOUNT");
+        recoveryControllerExtension.depositUnderlying(0);
+    }
+
+    function testFuzz_Revert_depositUnderlying_NoOpenPositions(
+        address depositor,
+        uint256 amount,
+        UserState memory user,
+        ControllerState memory controller
+    ) public {
+        // Given: The protocol is active.
+        controller.active = true;
+
+        // And: "amount" is non-zero.
+        vm.assume(amount > 0);
+
+        // And: There are no open positions on the "recoveryController".
+        controller.supplyWRT = 0;
+
+        // And: state is persisted.
+        setUserState(user);
+        setControllerState(controller);
+
+        // When: A "depositor" deposits 0 of "underlyingToken".
+        // Then: Transaction should revert with "" (solmate mulDivDown division by zero).
+        vm.prank(depositor);
+        vm.expectRevert(bytes(""));
         recoveryControllerExtension.depositUnderlying(amount);
     }
 
@@ -517,10 +629,13 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension".
+        // Given: "aggrievedUser" is not the "recoveryController".
         vm.assume(user.addr != address(recoveryControllerExtension));
 
-        // And: "depositor" is not "aggrievedUser" or "recoveryControllerExtension".
+        // And: "amount" is non-zero.
+        vm.assume(amount > 0);
+
+        // And: "depositor" is not "aggrievedUser" or "recoveryController".
         vm.assume(depositor != address(recoveryControllerExtension));
         vm.assume(depositor != user.addr);
 
@@ -531,10 +646,11 @@ contract RecoveryController_Integration_Test is Integration_Test {
         vm.assume(controller.supplyWRT > 0);
 
         // And: Balance "controller.supplyUT" does not overflow (ERC20 Invariant).
-        amount = bound(amount, 0, type(uint256).max - controller.balanceUT);
+        vm.assume(controller.balanceUT < type(uint256).max);
+        amount = bound(amount, 1, type(uint256).max - controller.balanceUT);
 
         // And: Assume "delta" does not overflow (unrealistic big numbers).
-        amount = bound(amount, 0, type(uint256).max / 10e18);
+        amount = bound(amount, 1, type(uint256).max / 10e18);
         uint256 delta = amount * 10e18 / controller.supplyWRT;
         // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
         vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
@@ -600,7 +716,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
     function testFuzz_maxRedeemable_NonRecoveredPosition(UserState memory user, ControllerState memory controller)
         public
     {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension".
+        // Given: "aggrievedUser" is not the "recoveryController".
         vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
@@ -624,7 +740,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
     function testFuzz_maxRedeemable_FullyRecoveredPosition(UserState memory user, ControllerState memory controller)
         public
     {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension".
+        // Given: "aggrievedUser" is not the "recoveryController".
         vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
@@ -650,7 +766,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension".
+        // Given: "aggrievedUser" is not the "recoveryController".
         vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
@@ -685,7 +801,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension" or "owner".
+        // Given: "aggrievedUser" is not the "recoveryController" or "owner".
         vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
@@ -729,7 +845,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension" or "owner".
+        // Given: "aggrievedUser" is not the "recoveryController" or "owner".
         vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
@@ -816,7 +932,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension".
+        // Given: "aggrievedUser" is not the "recoveryController".
         vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
@@ -836,7 +952,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         setUserState(user);
         setControllerState(controller);
 
-        // And: "user" has approved "recoveryControllerExtension" with at least "amount".
+        // And: "user" has approved "recoveryController" with at least "amount".
         vm.prank(user.addr);
         recoveryToken.approve(address(recoveryControllerExtension), amount);
 
@@ -861,7 +977,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension".
+        // Given: "aggrievedUser" is not the "recoveryController".
         vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
@@ -882,7 +998,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         setUserState(user);
         setControllerState(controller);
 
-        // And: "user" has approved "recoveryControllerExtension" with at least "amount".
+        // And: "user" has approved "recoveryController" with at least "amount".
         vm.prank(user.addr);
         recoveryToken.approve(address(recoveryControllerExtension), amount);
 
@@ -912,7 +1028,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension" or "owner".
+        // Given: "aggrievedUser" is not the "recoveryController" or "owner".
         vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
@@ -937,13 +1053,13 @@ contract RecoveryController_Integration_Test is Integration_Test {
         controller.supplyWRT = user.balanceWRT;
 
         // And: Assume "surplus" does not overflow (unrealistic big numbers).
-        vm.assume(redeemable <= type(uint256).max - user.redeemed);
+        vm.assume(redeemable <= type(uint256).max - user.redeemed - amount);
 
         // And: State is persisted.
         setUserState(user);
         setControllerState(controller);
 
-        // And: "user" has approved "recoveryControllerExtension" with at least "amount".
+        // And: "user" has approved "recoveryController" with at least "amount".
         vm.prank(user.addr);
         recoveryToken.approve(address(recoveryControllerExtension), amount);
 
@@ -956,17 +1072,15 @@ contract RecoveryController_Integration_Test is Integration_Test {
         assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
         assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT - amount);
-        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition + amount);
 
         // And: "controller" state variables are updated.
         assertEq(wrappedRecoveryToken.totalSupply(), 0);
-        assertEq(
-            recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT + amount - openPosition
-        );
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
         assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), 0);
 
         // And: "underlyingToken" balance of "owner" increases with remaining funds.
-        assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - openPosition);
+        assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - openPosition - amount);
     }
 
     function testFuzz_depositRecoveryTokens_WithInitialPosition_FullyRecoveredPosition_NotLastPosition(
@@ -974,7 +1088,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension" or "owner".
+        // Given: "aggrievedUser" is not the "recoveryController" or "owner".
         vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
@@ -1012,7 +1126,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         setUserState(user);
         setControllerState(controller);
 
-        // And: "user" has approved "recoveryControllerExtension" with at least "amount".
+        // And: "user" has approved "recoveryController" with at least "amount".
         vm.prank(user.addr);
         recoveryToken.approve(address(recoveryControllerExtension), amount);
 
@@ -1025,15 +1139,16 @@ contract RecoveryController_Integration_Test is Integration_Test {
         assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
         assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT - amount);
-        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition + amount);
 
         // And: "controller" state variables are updated.
         assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - user.balanceWRT);
         assertEq(recoveryControllerExtension.redeemablePerRTokenGlobal(), controller.redeemablePerRTokenGlobal + delta);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
         assertEq(
-            recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT + amount - openPosition
+            underlyingToken.balanceOf(address(recoveryControllerExtension)),
+            controller.balanceUT - openPosition - amount
         );
-        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - openPosition);
 
         // And: "underlyingToken" balance of "owner" increases with remaining funds.
         assertEq(underlyingToken.balanceOf(users.owner), 0);
@@ -1065,7 +1180,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension".
+        // Given: "aggrievedUser" is not the "recoveryController".
         vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
@@ -1111,8 +1226,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension".
+        // Given: "aggrievedUser" is not the "recoveryController" or "owner".
         vm.assume(user.addr != address(recoveryControllerExtension));
+        vm.assume(user.addr != address(users.owner));
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -1158,8 +1274,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension".
+        // Given: "aggrievedUser" is not the "recoveryController" or "owner".
         vm.assume(user.addr != address(recoveryControllerExtension));
+        vm.assume(user.addr != address(users.owner));
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -1206,7 +1323,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension" or "owner".
+        // Given: "aggrievedUser" is not the "recoveryController" or "owner".
         vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
@@ -1257,7 +1374,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryControllerExtension" or "owner".
+        // Given: "aggrievedUser" is not the "recoveryController" or "owner".
         vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 

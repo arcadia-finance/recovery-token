@@ -131,7 +131,8 @@ contract RecoveryController is ERC20, Owned {
      * @notice Mints Wrapped Recovery Tokens.
      * @param to The address that receives the minted tokens.
      * @param amount The amount of tokens minted.
-     * @dev Mints an equal amount of (unwrapped) Recovery Tokens.
+     * @dev Mints an amount of Recovery Tokens to the controller,
+     * equal to the minted Wrapped Recovery Tokens.
      */
     function mint(address to, uint256 amount) external onlyOwner notActive {
         _mint(to, amount);
@@ -143,6 +144,8 @@ contract RecoveryController is ERC20, Owned {
      * @param tos Array with addresses that receives the minted tokens.
      * @param amounts Array with amounts of tokens minted.
      * @dev Mints an amount of (unwrapped) Recovery Tokens equal to sum of all amounts.
+     * @dev Mints an amount of Recovery Tokens to the controller,
+     * equal to the sum of all minted Wrapped Recovery Tokens.
      */
     function batchMint(address[] calldata tos, uint256[] calldata amounts) external onlyOwner notActive {
         uint256 length = tos.length;
@@ -164,34 +167,55 @@ contract RecoveryController is ERC20, Owned {
         recoveryToken.mint(totalAmount);
     }
 
-    //ToDo: if burn > redeemable, delete entire position.
     /**
      * @notice Burns Wrapped Recovery Tokens.
      * @param from The address from which the tokens are burned.
      * @param amount The amount of tokens burned.
-     * @dev Burns an equal amount of (unwrapped) Recovery Tokens.
+     * @dev Burns an amount of Recovery Tokens, held by the controller,
+     * equal to the burned unredeemed Wrapped Recovery Tokens.
      */
     function burn(address from, uint256 amount) external onlyOwner {
-        _burn(from, amount);
+        uint256 openPosition = balanceOf[from] - redeemed[from];
+
+        // Burn the Wrapped Recovery Tokens.
+        if (amount >= openPosition) {
+            _closePosition(from);
+            amount = openPosition;
+        } else {
+            _burn(from, amount);
+        }
+
+        // Burn the corresponding Recovery Tokens held by the controller.
         recoveryToken.burn(amount);
     }
 
     /**
      * @notice Batch burns Wrapped Recovery Tokens.
-     * @param tos Array with addresses from which the tokens are burned.
+     * @param froms Array with addresses from which the tokens are burned.
      * @param amounts Array with amounts of tokens burned.
-     * @dev Burns an amount of (unwrapped) Recovery Tokens equal to sum of all amounts.
+     * @dev Burns an amount of Recovery Tokens, held by the controller,
+     * equal to the sum of all burned unredeemed Wrapped Recovery Tokens.
      */
-    function batchBurn(address[] calldata tos, uint256[] calldata amounts) external onlyOwner {
-        uint256 length = tos.length;
-        uint256 totalAmount;
-
+    function batchBurn(address[] calldata froms, uint256[] calldata amounts) external onlyOwner {
+        uint256 length = froms.length;
         require(length == amounts.length, "LENGTH_MISMATCH");
 
+        address from;
+        uint256 openPosition;
         uint256 amount;
+        uint256 totalAmount;
         for (uint256 i; i < length;) {
+            from = froms[i];
+            openPosition = balanceOf[from] - redeemed[from];
             amount = amounts[i];
-            _burn(tos[i], amount);
+
+            // Burn the Wrapped Recovery Tokens.
+            if (amount >= openPosition) {
+                _closePosition(from);
+                amount = openPosition;
+            } else {
+                _burn(from, amount);
+            }
 
             unchecked {
                 ++i;
@@ -199,6 +223,7 @@ contract RecoveryController is ERC20, Owned {
             }
         }
 
+        // Burn the corresponding Recovery Tokens held by the controller.
         recoveryToken.burn(totalAmount);
     }
 
@@ -212,6 +237,8 @@ contract RecoveryController is ERC20, Owned {
      * @param amount The amount of underlying tokens deposited.
      */
     function depositUnderlying(uint256 amount) external isActive {
+        require(amount != 0, "DU: ZERO_AMOUNT");
+
         _distributeUnderlying(amount);
         ERC20(underlying).safeTransferFrom(msg.sender, address(this), amount);
     }
@@ -234,7 +261,7 @@ contract RecoveryController is ERC20, Owned {
         if (openPosition <= redeemable) {
             // Updated balance of redeemed Underlying Tokens exceeds the non-redeemed rTokens.
             // -> Close the position and settle surplus rTokens.
-            _closeRecoveredPosition(owner_);
+            _closePosition(owner_);
             uint256 surplus = redeemable - openPosition;
             redeemable = openPosition;
             _settleSurplus(surplus, redeemable);
@@ -273,13 +300,13 @@ contract RecoveryController is ERC20, Owned {
                 initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[msg.sender], 10e18);
         }
 
-        uint256 openPosition = initialBalance - redeemedLast;
+        uint256 openPosition = initialBalance + amount - redeemedLast;
 
-        if (openPosition + amount <= redeemable) {
+        if (openPosition <= redeemable) {
             // Updated balance of redeemed Underlying Tokens exceeds the non-redeemed rTokens.
             // Close the position and distribute the surplus to other rToken-Holders.
-            _closeRecoveredPosition(msg.sender);
-            uint256 surplus = redeemable - openPosition - amount;
+            _closePosition(msg.sender);
+            uint256 surplus = redeemable - openPosition;
             redeemable = openPosition;
             // Settle surplus to other rToken-Holders or the Protocol Owner.
             _settleSurplus(surplus, redeemable);
@@ -318,7 +345,7 @@ contract RecoveryController is ERC20, Owned {
             // Updated balance of redeemed Underlying Tokens, even before withdrawing rTokens,
             // exceeds the non-redeemed rTokens.
             // -> Close the position and settle surplus rTokens.
-            _closeRecoveredPosition(msg.sender);
+            _closePosition(msg.sender);
             uint256 surplus = redeemable - openPosition;
             redeemable = openPosition;
             // Settle surplus to other rToken-Holders or the Protocol Owner.
@@ -328,7 +355,7 @@ contract RecoveryController is ERC20, Owned {
                 // Updated balance of redeemed Underlying Tokens, after withdrawing rTokens
                 // exceeds the non-redeemed rTokens.
                 // -> Close the position and withdraw the remaining rTokens.
-                _closeRecoveredPosition(msg.sender);
+                _closePosition(msg.sender);
                 amount = openPosition - redeemable;
                 // Check if there is surplus to settle to the Protocol Owner.
                 _settleSurplus(0, redeemable);
@@ -377,7 +404,7 @@ contract RecoveryController is ERC20, Owned {
      * @notice Logic to close a fully recovered position.
      * @param owner_ The owner of the fully recovered position.
      */
-    function _closeRecoveredPosition(address owner_) internal {
+    function _closePosition(address owner_) internal {
         redeemed[owner_] = 0;
         redeemablePerRTokenLast[owner_] = 0;
         _burn(owner_, balanceOf[owner_]);

@@ -13,3 +13,20 @@ struct Users {
     address payable alice;
     address payable bob;
 }
+
+struct UserState {
+    address addr;
+    uint256 redeemed;
+    uint256 redeemablePerRTokenLast;
+    uint256 balanceWRT;
+    uint256 balanceRT;
+    uint256 balanceUT;
+}
+
+struct ControllerState {
+    bool active;
+    uint256 redeemablePerRTokenGlobal;
+    uint256 supplyWRT;
+    uint256 balanceRT;
+    uint256 balanceUT;
+}

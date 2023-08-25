@@ -5,6 +5,8 @@
 pragma solidity ^0.8.13;
 
 import {Invariant_Test} from "./Invariant.t.sol";
+import {RecoveryTokenHandler} from "./handlers/RecoveryTokenHandler.sol";
+import {ActiveRecoveryControllerHandler} from "./handlers/ActiveRecoveryControllerHandler.sol";
 
 /// @notice Common logic needed by all invariant tests.
 contract Active_Invariant_Test is Invariant_Test {
@@ -19,6 +21,9 @@ contract Active_Invariant_Test is Invariant_Test {
                                    TEST CONTRACTS
     //////////////////////////////////////////////////////////////////////////*/
 
+    RecoveryTokenHandler internal recoveryTokenHandler;
+    ActiveRecoveryControllerHandler internal recoveryControllerHandler;
+
     /*//////////////////////////////////////////////////////////////////////////
                                      MODIFIERS
     //////////////////////////////////////////////////////////////////////////*/
@@ -28,6 +33,19 @@ contract Active_Invariant_Test is Invariant_Test {
     //////////////////////////////////////////////////////////////////////////*/
     function setUp() public override {
         Invariant_Test.setUp();
+
+        // Deploy handlers.
+        recoveryTokenHandler = new RecoveryTokenHandler(state, recoveryToken);
+        recoveryControllerHandler =
+            new ActiveRecoveryControllerHandler(state, underlyingToken, recoveryToken, recoveryController);
+
+        // Target handlers.
+        targetContract(address(recoveryTokenHandler));
+        targetContract(address(recoveryControllerHandler));
+
+        // Exclude deployed contracts as senders.
+        excludeSender(address(recoveryTokenHandler));
+        excludeSender(address(recoveryControllerHandler));
 
         // Add actors who don't start with initial Recovery Tokens.
         state.addActor(users.alice);
