@@ -164,6 +164,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // When "owner_" deploys "recoveryController_".
         vm.prank(owner_);
+        vm.expectEmit();
+        emit ActiveSet(false);
         RecoveryControllerExtension recoveryController_ = new RecoveryControllerExtension(address(underlyingToken));
 
         // Then: the immutable variables are set on "recoveryController_".
@@ -191,6 +193,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Given:
         // When: "unprivilegedAddress" calls "activate".
         vm.prank(users.owner);
+        vm.expectEmit(address(recoveryControllerExtension));
+        emit ActiveSet(true);
         recoveryControllerExtension.activate();
 
         // Then "RecoveryController" is active.

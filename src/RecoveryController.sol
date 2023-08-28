@@ -48,6 +48,12 @@ contract RecoveryController is ERC20, Owned {
     // The (unwrapped) Recovery Token contract.
     RecoveryToken public immutable recoveryToken;
 
+    /* //////////////////////////////////////////////////////////////
+                                EVENTS
+    ////////////////////////////////////////////////////////////// */
+
+    event ActiveSet(bool active);
+
     /*//////////////////////////////////////////////////////////////
                                ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -105,6 +111,8 @@ contract RecoveryController is ERC20, Owned {
     {
         underlying = underlying_;
         recoveryToken = new RecoveryToken(msg.sender, address(this), decimals);
+
+        emit ActiveSet(false);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -118,6 +126,8 @@ contract RecoveryController is ERC20, Owned {
      */
     function activate() external onlyOwner {
         active = true;
+
+        emit ActiveSet(true);
     }
 
     /*//////////////////////////////////////////////////////////////

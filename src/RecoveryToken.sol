@@ -20,7 +20,7 @@ contract RecoveryToken is ERC20, Owned {
     //////////////////////////////////////////////////////////////*/
 
     // The contract address of the Recovery Controller.
-    address internal immutable recoveryController;
+    address public immutable recoveryController;
 
     /*//////////////////////////////////////////////////////////////
                                ERRORS
