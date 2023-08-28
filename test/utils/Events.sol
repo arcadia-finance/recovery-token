@@ -10,5 +10,7 @@ abstract contract Events {
                         RECOVERY CONTROLLER
     //////////////////////////////////////////////////////////////*/
 
-    event ActiveSet(bool active);
+    event ActivationSet(bool active);
+
+    event TerminationInitiated(uint32 timestamp);
 }

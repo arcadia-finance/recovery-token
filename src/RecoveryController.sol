@@ -62,7 +62,17 @@ contract RecoveryController is ERC20, Owned {
                                 EVENTS
     ////////////////////////////////////////////////////////////// */
 
-    event ActiveSet(bool active);
+    /**
+     * @notice Emitted when a value for the activity of the Controller is set.
+     * @param active Bool indicating if the contract is activated or not.
+     */
+    event ActivationSet(bool active);
+
+    /**
+     * @notice Emitted when the termination of the Controller is initiated.
+     * @param timestamp The timestamp when the termination of the contract is initiated.
+     */
+    event TerminationInitiated(uint32 timestamp);
 
     /*//////////////////////////////////////////////////////////////
                                ERRORS
@@ -128,7 +138,7 @@ contract RecoveryController is ERC20, Owned {
         underlying = underlying_;
         recoveryToken = new RecoveryToken(msg.sender, address(this), decimals);
 
-        emit ActiveSet(false);
+        emit ActivationSet(false);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -145,7 +155,7 @@ contract RecoveryController is ERC20, Owned {
 
         active = true;
 
-        emit ActiveSet(true);
+        emit ActivationSet(true);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -503,6 +513,8 @@ contract RecoveryController is ERC20, Owned {
      */
     function initiateTermination() external onlyOwner {
         terminationTimestamp = uint32(block.timestamp);
+
+        emit TerminationInitiated(uint32(block.timestamp));
     }
 
     /**
@@ -520,5 +532,7 @@ contract RecoveryController is ERC20, Owned {
 
         // Withdraw any remaining Underlying Tokens back to the Protocol Owner.
         ERC20(underlying).safeTransfer(owner, ERC20(underlying).balanceOf(address(this)));
+
+        emit ActivationSet(false);
     }
 }
