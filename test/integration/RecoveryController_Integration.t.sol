@@ -178,7 +178,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
                         ACTIVATION LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function testFuzz_Revert_activate(address unprivilegedAddress) public {
+    function testFuzz_Revert_activate_NonOwner(address unprivilegedAddress) public {
         // Given: Caller is not the "owner".
         vm.assume(unprivilegedAddress != users.owner);
 
@@ -189,9 +189,21 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryControllerExtension.activate();
     }
 
+    function testFuzz_Revert_activate_Terminated(uint32 terminationTimestamp) public {
+        // Given: The termination is already initialised.
+        terminationTimestamp = uint32(bound(terminationTimestamp, 1, type(uint32).max));
+        recoveryControllerExtension.setTerminationTimestamp(terminationTimestamp);
+
+        // When: "owner" calls "activate".
+        // Then: Transaction should revert with "ControllerTerminated".
+        vm.prank(users.owner);
+        vm.expectRevert(ControllerTerminated.selector);
+        recoveryControllerExtension.activate();
+    }
+
     function test_activate() public {
         // Given:
-        // When: "unprivilegedAddress" calls "activate".
+        // When: "owner" calls "activate".
         vm.prank(users.owner);
         vm.expectEmit(address(recoveryControllerExtension));
         emit ActiveSet(true);
@@ -1463,4 +1475,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // And: "underlyingToken" balance of "owner" increases with remaining funds.
         assertEq(underlyingToken.balanceOf(users.owner), 0);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        CONTRACT TERMINATION
+    //////////////////////////////////////////////////////////////*/
 }

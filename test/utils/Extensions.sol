@@ -14,6 +14,10 @@ contract RecoveryControllerExtension is RecoveryController {
         underlying_ = address(underlying);
     }
 
+    function setTerminationTimestamp(uint32 terminationTimestamp_) public {
+        terminationTimestamp = terminationTimestamp_;
+    }
+
     function distributeUnderlying(uint256 amount) public {
         _distributeUnderlying(amount);
     }

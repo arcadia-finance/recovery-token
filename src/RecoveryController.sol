@@ -28,25 +28,35 @@ contract RecoveryController is ERC20, Owned {
     using FixedPointMathLib for uint256;
 
     /*//////////////////////////////////////////////////////////////
+                               CONSTANTS
+    //////////////////////////////////////////////////////////////*/
+
+    // Minimum cooldown period between the termination initiation and finalisation.
+    uint256 internal constant COOLDOWN_PERIOD = 1 weeks;
+
+    /*//////////////////////////////////////////////////////////////
                                STORAGE
     //////////////////////////////////////////////////////////////*/
+
+    // The contract address of the Underlying Token.
+    address internal immutable underlying;
+
+    // The (unwrapped) Recovery Token contract.
+    RecoveryToken public immutable recoveryToken;
 
     // Bool indicating if the contract is activated or not.
     bool public active;
 
+    // Timestamp that the termination of the contract is initiated.
+    uint32 public terminationTimestamp;
+
     // The growth of Underlying Tokens redeemed per Wrapped Recovery Token for the entire life of the contract.
     uint256 public redeemablePerRTokenGlobal;
-
-    // The contract address of the Underlying Token.
-    address internal immutable underlying;
 
     // Map tokenHolder => Growth of Underlying Tokens redeemed per Wrapped Recovery Token at the owner last interaction.
     mapping(address => uint256) public redeemablePerRTokenLast;
     // Map tokenHolder => Amount of Recovery Tokens redeemed for Underlying Tokens.
     mapping(address => uint256) public redeemed;
-
-    // The (unwrapped) Recovery Token contract.
-    RecoveryToken public immutable recoveryToken;
 
     /* //////////////////////////////////////////////////////////////
                                 EVENTS
@@ -57,6 +67,9 @@ contract RecoveryController is ERC20, Owned {
     /*//////////////////////////////////////////////////////////////
                                ERRORS
     //////////////////////////////////////////////////////////////*/
+
+    // Thrown if the Contract is terminated.
+    error ControllerTerminated();
 
     // Thrown if the Contract is not active.
     error NotActive();
@@ -75,6 +88,9 @@ contract RecoveryController is ERC20, Owned {
 
     // Thrown when trying to withdraw zero assets.
     error WithdrawAmountZero();
+
+    // Thrown when less time as the cooldown period passed between the termination initiation and finalisation.
+    error TerminationCoolDownPeriodNotPassed();
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -125,6 +141,8 @@ contract RecoveryController is ERC20, Owned {
      * and no new recoveryTokens can be minted.
      */
     function activate() external onlyOwner {
+        if (terminationTimestamp != 0) revert ControllerTerminated();
+
         active = true;
 
         emit ActiveSet(true);
@@ -478,7 +496,29 @@ contract RecoveryController is ERC20, Owned {
                         CONTRACT TERMINATION
     //////////////////////////////////////////////////////////////*/
 
-    function initiateTermination() external onlyOwner {}
+    /**
+     * @notice Starts the termination process.
+     * @dev The termination process is a two step process, a fixed 'COOLDOWN_PERIOD' should pass between initiation and finalisation..
+     * @dev during the 'COOLDOWN_PERIOD' all Wrapped Recovery Token Holders should claim their redeemable balances.
+     */
+    function initiateTermination() external onlyOwner {
+        terminationTimestamp = uint32(block.timestamp);
+    }
 
-    function executeTermination() external onlyOwner {}
+    /**
+     * @notice Finalises the termination process.
+     * @dev The termination process is a two step process, a fixed 'COOLDOWN_PERIOD' should pass between initiation and finalisation.
+     * @dev After the 'COOLDOWN_PERIOD' the 'owner' of the Controller can withdraw the remaining balance of Underlying Tokens.
+     * When the termination is finalised, the Controller will cease to operate and cannot be restarted.
+     */
+    function finaliseTermination() external onlyOwner {
+        if (terminationTimestamp == 0 || terminationTimestamp + COOLDOWN_PERIOD > uint32(block.timestamp)) {
+            revert TerminationCoolDownPeriodNotPassed();
+        }
+
+        active = false;
+
+        // Withdraw any remaining Underlying Tokens back to the Protocol Owner.
+        ERC20(underlying).safeTransfer(owner, ERC20(underlying).balanceOf(address(this)));
+    }
 }

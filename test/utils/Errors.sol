@@ -16,6 +16,8 @@ abstract contract Errors {
                         RECOVERY CONTROLLER
     //////////////////////////////////////////////////////////////*/
 
+    error ControllerTerminated();
+
     error NotActive();
 
     error Active();
@@ -27,4 +29,6 @@ abstract contract Errors {
     error DepositAmountZero();
 
     error WithdrawAmountZero();
+
+    error TerminationCoolDownPeriodNotPassed();
 }
