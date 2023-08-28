@@ -53,7 +53,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         vm.assume(unprivilegedAddress != address(recoveryController));
 
         // When: Caller mints "amount".
-        // Then: Call should revert with "UNAUTHORIZED".
+        // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
         recoveryToken_.mint(amount);
@@ -84,7 +84,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         vm.assume(amount > initialBalance);
 
         // When: "aggrievedUser" burns "amount".
-        // Then: Call should revert with "arithmeticError".
+        // Then: Transaction should revert with "arithmeticError".
         vm.prank(aggrievedUser);
         vm.expectRevert(stdError.arithmeticError);
         recoveryToken_.burn(amount);
@@ -116,7 +116,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         deal(address(recoveryToken_), aggrievedUser, initialBalance);
 
         // When: "unprivilegedAddress" burns "amount" of "aggrievedUser".
-        // Then: Call should revert with "UNAUTHORIZED".
+        // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
         recoveryToken_.burn(aggrievedUser, amount);
@@ -133,7 +133,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         vm.assume(amount > initialBalance);
 
         // When: "recoveryController" burns "amount" of "aggrievedUser".
-        // Then: Call should revert with "arithmeticError".
+        // Then: Transaction should revert with "arithmeticError".
         vm.prank(address(recoveryController));
         vm.expectRevert(stdError.arithmeticError);
         recoveryToken_.burn(aggrievedUser, amount);

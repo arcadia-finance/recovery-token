@@ -6,6 +6,7 @@ pragma solidity ^0.8.13;
 
 import {Base_Test} from "../Base.t.sol";
 
+import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {RecoveryControllerExtension} from "../utils/Extensions.sol";
 import {RecoveryToken} from "../../src/RecoveryToken.sol";
@@ -21,8 +22,9 @@ abstract contract Integration_Test is Base_Test {
     //////////////////////////////////////////////////////////////////////////*/
 
     ERC20Mock internal underlyingToken;
-    RecoveryControllerExtension internal recoveryController;
     RecoveryToken internal recoveryToken;
+    RecoveryControllerExtension internal recoveryController;
+    ERC20 wrappedRecoveryToken;
 
     /*//////////////////////////////////////////////////////////////////////////
                                   SET-UP FUNCTION
@@ -39,8 +41,9 @@ abstract contract Integration_Test is Base_Test {
         // Deploy the base test contracts.
         vm.startPrank(users.creator);
         recoveryController = new RecoveryControllerExtension(address(underlyingToken));
-        recoveryToken = RecoveryToken(recoveryController.getRecoveryToken());
+        recoveryToken = RecoveryToken(recoveryController.recoveryToken());
         vm.stopPrank();
+        wrappedRecoveryToken = ERC20(address(recoveryController));
 
         // Label the base test contracts.
         vm.label({account: address(recoveryController), newLabel: "RecoveryController"});

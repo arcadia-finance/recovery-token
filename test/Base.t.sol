@@ -10,9 +10,10 @@ import {Errors} from "./utils/Errors.sol";
 import {Events} from "./utils/Events.sol";
 import {RecoveryControllerExtension} from "./utils/Extensions.sol";
 import {Users} from "./utils/Types.sol";
+import {Utils} from "./utils/Utils.sol";
 
 /// @notice Base test contract with common logic needed by all tests.
-abstract contract Base_Test is Test, Events, Errors {
+abstract contract Base_Test is Test, Events, Errors, Utils {
     /*//////////////////////////////////////////////////////////////////////////
                                      VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
@@ -31,10 +32,12 @@ abstract contract Base_Test is Test, Events, Errors {
         // Create users for testing
         users = Users({
             creator: createUser("creator"),
+            owner: users.creator,
             tokenCreator: createUser("tokenCreator"),
             aggrievedUser0: createUser("aggrievedUser0"),
             aggrievedUser1: createUser("aggrievedUser1")
         });
+        users.owner = users.creator;
     }
 
     /*//////////////////////////////////////////////////////////////////////////

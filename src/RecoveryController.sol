@@ -12,7 +12,7 @@ import {RecoveryToken} from "./RecoveryToken.sol";
  * @title Recovery Tokens.
  * @author Pragma Labs
  * @notice Handles the accounting and redemption of Recovery Tokens for Underlying Tokens,
- * both if assets are recovered via legal means, or if the lost assets are recovered via other means..
+ * both if assets are redeemed via legal means, or if the lost assets are redeemed via other means..
  * In the second situation the underlying assets will be distributed pro-rata to all holders of
  * Wrapped Recovery Tokens in discrete batches.
  * @dev Recovery Tokens can be redeemed one-to-one for Underlying Tokens.
@@ -31,21 +31,19 @@ contract RecoveryController is ERC20, Owned {
     // Bool indicating if the contract is activated or not.
     bool public active;
 
-    // The growth of Underlying Tokens recovered per Wrapped Recovery Token for the entire life of the contract.
-    uint256 public recoveryPerRTokenGlobal;
-    // The unit (10^decimals) of the Underlying Token and the Recovery Token.
-    uint256 internal immutable unit;
+    // The growth of Underlying Tokens redeemed per Wrapped Recovery Token for the entire life of the contract.
+    uint256 public redeemablePerRTokenGlobal;
 
     // The contract address of the Underlying Token.
     address internal immutable underlying;
 
-    // Map owner => Growth of Underlying Tokens recovered per Wrapped Recovery Token at the owner last interaction.
-    mapping(address => uint256) internal recoveryPerRTokenLast;
-    // Map owner => Amount of Recovery Tokens redeemed for Underlying Tokens.
-    mapping(address => uint256) public recovered;
+    // Map tokenHolder => Growth of Underlying Tokens redeemed per Wrapped Recovery Token at the owner last interaction.
+    mapping(address => uint256) internal redeemablePerRTokenLast;
+    // Map tokenHolder => Amount of Recovery Tokens redeemed for Underlying Tokens.
+    mapping(address => uint256) public redeemed;
 
     // The (unwrapped) Recovery Token contract.
-    RecoveryToken internal immutable recoveryToken;
+    RecoveryToken public immutable recoveryToken;
 
     /*//////////////////////////////////////////////////////////////
                                ERRORS
@@ -61,7 +59,7 @@ contract RecoveryController is ERC20, Owned {
      * @dev Throws if the contract is not active.
      */
     modifier isActive() {
-        require(active, "NOT ACTIVE");
+        require(active, "NOT_ACTIVE");
 
         _;
     }
@@ -70,7 +68,7 @@ contract RecoveryController is ERC20, Owned {
      * @dev Throws if the contract is active.
      */
     modifier notActive() {
-        require(!active, "NOT ACTIVE");
+        require(!active, "ACTIVE");
 
         _;
     }
@@ -87,183 +85,20 @@ contract RecoveryController is ERC20, Owned {
         Owned(msg.sender)
     {
         underlying = underlying_;
-        unit = 10 ** decimals;
         recoveryToken = new RecoveryToken(msg.sender, address(this), decimals);
     }
 
     /*//////////////////////////////////////////////////////////////
-                        RECOVERY TOKEN LOGIC
+                        ACTIVATION LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Deposits the underlying assets to this contract.
-     * Deposited assets become recoverable pro-rata by the Wrapped Recovery Token Holders.
-     * @param amount The amount of underlying tokens deposited.
+     * @notice Sets contract to active.
+     * @dev After the contract is active, token holders can withdraw, deposit and interact with the contract,
+     * and no new recoveryTokens can be minted.
      */
-    function depositUnderlying(uint256 amount) external {
-        _distributeUnderlying(amount);
-        ERC20(underlying).safeTransferFrom(msg.sender, address(this), amount);
-    }
-
-    /**
-     * @notice Deposits (wraps) Recovery Tokens.
-     * @param amount The non-redeemed rTokens deposited.
-     * @dev Holders of Recovery Tokens need to deposit the tokens in this contract before
-     * they can redeem the Recovery Tokens for recovered Underlying Tokens.
-     */
-    function depositRecoveryTokens(uint256 amount) external isActive {
-        // Cache token balances.
-        uint256 initialBalance = balanceOf[msg.sender];
-        uint256 recoveredLast;
-        uint256 recoverable;
-
-        // recoveryToken is a trusted contract.
-        recoveryToken.transferFrom(msg.sender, address(this), amount);
-
-        if (initialBalance > 0) {
-            recoveredLast = recovered[msg.sender];
-            // Calculate the recoverable underlying tokens since the last redemption.
-            recoverable = initialBalance * (recoveryPerRTokenGlobal - recoveryPerRTokenLast[msg.sender]);
-        }
-
-        if (initialBalance + amount <= recoveredLast + recoverable) {
-            // Updated balance of recovered Underlying Tokens exceed the non-redeemed rTokens.
-            // Close the position and distribute the surplus to other rToken-Holders.
-            _closeRecoveredPosition(msg.sender);
-            uint256 surplus = recoveredLast + recoverable - initialBalance - amount;
-            _distributeUnderlying(surplus);
-        } else {
-            // Update accounting for total recovered Underlying Tokens.
-            recovered[msg.sender] = recoveredLast + recoverable;
-            recoveryPerRTokenLast[msg.sender] = recoveryPerRTokenGlobal;
-
-            // Update accounting for newly deposited rTokens.
-            _mint(msg.sender, amount);
-        }
-
-        // Reentrancy: Transfer the Underlying Tokens after logic.
-        _redeemUnderlying(msg.sender, recoverable);
-    }
-
-    /**
-     * @notice Withdraws (unwraps) Recovery Tokens.
-     * @param amount The non-redeemed rTokens withdrawn.
-     * @dev Holders of Recovery Tokens need to deposit the tokens in this contract before
-     * they can redeem the Recovery Tokens for recovered Underlying Tokens.
-     */
-    function withdrawRecoveryTokens(uint256 amount) external isActive {
-        // Cache token balances.
-        uint256 initialBalance = balanceOf[msg.sender];
-        uint256 recoveredLast = recovered[msg.sender];
-
-        // Calculate the recoverable underlying tokens since the last redemption.
-        uint256 recoverable = initialBalance * (recoveryPerRTokenGlobal - recoveryPerRTokenLast[msg.sender]);
-
-        if (initialBalance <= recoveredLast + recoverable) {
-            // Updated balance of recovered Underlying Tokens, even without withdrawing rTokens,
-            // exceeds the non-redeemed rTokens.
-            // Close the position, distribute the surplus to other rToken-Holders and no rTokens will be withdrawn.
-            _closeRecoveredPosition(msg.sender);
-            uint256 surplus = recoveredLast + recoverable - initialBalance;
-            recoverable = initialBalance - recoveredLast;
-            _distributeUnderlying(surplus);
-        } else {
-            if (initialBalance <= recoveredLast + recoverable + amount) {
-                // Updated balance of recovered Underlying Tokens would exceed the non-redeemed rTokens
-                // after withdrawing rTokens,.
-                // Close the position, and withdraw the remaining rTokens.
-                _closeRecoveredPosition(msg.sender);
-                amount = initialBalance - recoveredLast - recoverable;
-            } else {
-                // Update accounting for total recovered Underlying Tokens.
-                recovered[msg.sender] = recoveredLast + recoverable;
-                recoveryPerRTokenLast[msg.sender] = recoveryPerRTokenGlobal;
-
-                // Update accounting for withdrawn rTokens.
-                _burn(msg.sender, amount);
-            }
-
-            // Withdraw the Recovery Tokens to the owner.
-            recoveryToken.transfer(msg.sender, amount);
-        }
-
-        // Reentrancy: Transfer the Underlying Tokens after logic.
-        _redeemUnderlying(msg.sender, recoverable);
-    }
-
-    /**
-     * @notice Redeems Recovery Tokens for Underlying Tokens.
-     * @param owner_ The owner of the wrapped Recovery Tokens.
-     * @dev Everyone can call the redeem function for any address.
-     */
-    function redeemUnderlying(address owner_) external isActive {
-        // Cache token balances.
-        uint256 initialBalance = balanceOf[owner_];
-        uint256 recoveredLast = recovered[owner_];
-
-        // Calculate the recoverable underlying tokens since the last redemption.
-        uint256 recoverable = initialBalance * (recoveryPerRTokenGlobal - recoveryPerRTokenLast[owner_]);
-
-        if (initialBalance <= recoveredLast + recoverable) {
-            // Updated balance of recovered Underlying Tokens exceed the non-redeemed rTokens.
-            // Close the position and distribute the surplus to other rToken-Holders.
-            _closeRecoveredPosition(owner_);
-            uint256 surplus = recoveredLast + recoverable - initialBalance;
-            recoverable = initialBalance - recoveredLast;
-            _distributeUnderlying(surplus);
-        } else {
-            // Update accounting for total recovered Underlying Tokens.
-            recovered[owner_] = recoveredLast + recoverable;
-            recoveryPerRTokenLast[owner_] = recoveryPerRTokenGlobal;
-        }
-
-        // Reentrancy: Transfer the Underlying Tokens after logic.
-        _redeemUnderlying(owner_, recoverable);
-    }
-
-    /**
-     * @notice View function returns the recoverable balance.
-     * @param owner_ The owner of the wrapped Recovery Tokens.
-     */
-    function recoverableOf(address owner_) public view returns (uint256 recoverable) {
-        // Calculate the recoverable underlying tokens since the last redemption.
-        recoverable = balanceOf[owner_] * (recoveryPerRTokenGlobal - recoveryPerRTokenLast[owner_]);
-
-        // Minimum of the recoverable amount of underlying tokens and non-redeemed rTokens.
-        recoverable =
-            balanceOf[owner_] >= recoverable + recovered[owner_] ? recoverable : balanceOf[owner_] - recovered[owner_];
-    }
-
-    /**
-     * @notice Logic to redeem Recovery Tokens for Underlying Tokens.
-     * @param to The receiver of the Underlying Tokens.
-     * @param amount The amount of tokens redeemed.
-     * @dev Recovery Tokens are redeemed one-to-one for Underlying Tokens.
-     */
-    function _redeemUnderlying(address to, uint256 amount) internal {
-        // Burn the redeemed recovery tokens.
-        recoveryToken.burn(amount);
-        // Send equal amount of underlying assets.
-        // Reentrancy: Transfer the Underlying Tokens after logic.
-        ERC20(underlying).safeTransfer(to, amount);
-    }
-
-    /**
-     * @notice Logic to close a fully recovered position.
-     * @param owner_ The owner of the recovered Recovery Tokens.
-     */
-    function _closeRecoveredPosition(address owner_) internal {
-        recovered[owner_] = 0;
-        recoveryPerRTokenLast[owner_] = 0;
-        _burn(owner_, balanceOf[owner_]);
-    }
-
-    /**
-     * @notice Calculates and updates the growth of Underlying Tokens recovered per Wrapped Recovery Token.
-     * @param amount The amount of recovered Underlying Tokens.
-     */
-    function _distributeUnderlying(uint256 amount) internal {
-        recoveryPerRTokenGlobal += amount.mulDivDown(unit, totalSupply);
+    function activate() external onlyOwner {
+        active = true;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -361,6 +196,224 @@ contract RecoveryController is ERC20, Owned {
         }
 
         recoveryToken.burn(totalAmount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        RECOVERY TOKEN LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Deposits the underlying assets to this contract.
+     * Deposited assets become redeemable pro-rata by the Wrapped Recovery Token Holders.
+     * @param amount The amount of underlying tokens deposited.
+     */
+    function depositUnderlying(uint256 amount) external isActive {
+        _distributeUnderlying(amount);
+        ERC20(underlying).safeTransferFrom(msg.sender, address(this), amount);
+    }
+
+    /**
+     * @notice Redeems Recovery Tokens for Underlying Tokens.
+     * @param owner_ The owner of the wrapped Recovery Tokens.
+     * @dev Everyone can call the redeem function for any address.
+     */
+    function redeemUnderlying(address owner_) external isActive {
+        // Cache token balances.
+        uint256 initialBalance = balanceOf[owner_];
+        uint256 redeemedLast = redeemed[owner_];
+        uint256 openPosition = initialBalance - redeemedLast;
+
+        // Calculate the redeemable underlying tokens since the last redemption.
+        uint256 redeemable =
+            initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 10e18);
+
+        if (openPosition <= redeemable) {
+            // Updated balance of redeemed Underlying Tokens exceeds the non-redeemed rTokens.
+            // -> Close the position and settle surplus rTokens.
+            _closeRecoveredPosition(owner_);
+            uint256 surplus = redeemable - openPosition;
+            redeemable = openPosition;
+            _settleSurplus(surplus, redeemable);
+        } else {
+            // Position not fully recovered, update accounting for total redeemed Underlying Tokens.
+            redeemed[owner_] = redeemedLast + redeemable;
+            redeemablePerRTokenLast[owner_] = redeemablePerRTokenGlobal;
+        }
+
+        // Reentrancy: Transfer the Underlying Tokens after logic.
+        _redeemUnderlying(owner_, redeemable);
+    }
+
+    /**
+     * @notice Deposits (wraps) Recovery Tokens.
+     * @param amount The non-redeemed rTokens deposited.
+     * @dev Holders of Recovery Tokens need to deposit the tokens in this contract before
+     * they can redeem the Recovery Tokens for redeemed Underlying Tokens.
+     */
+    function depositRecoveryTokens(uint256 amount) external isActive {
+        require(amount != 0, "DRT: ZERO_AMOUNT");
+
+        // Cache token balances.
+        uint256 initialBalance = balanceOf[msg.sender];
+        uint256 redeemedLast;
+        uint256 redeemable;
+
+        // Reentrancy: recoveryToken is a trusted contract without hooks or external calls.
+        // Recovery Tokens need to be transferred to Controller before a position can be closed.
+        recoveryToken.transferFrom(msg.sender, address(this), amount);
+
+        if (initialBalance != 0) {
+            redeemedLast = redeemed[msg.sender];
+            // Calculate the redeemable underlying tokens since the last redemption.
+            redeemable =
+                initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[msg.sender], 10e18);
+        }
+
+        uint256 openPosition = initialBalance - redeemedLast;
+
+        if (openPosition + amount <= redeemable) {
+            // Updated balance of redeemed Underlying Tokens exceeds the non-redeemed rTokens.
+            // Close the position and distribute the surplus to other rToken-Holders.
+            _closeRecoveredPosition(msg.sender);
+            uint256 surplus = redeemable - openPosition - amount;
+            redeemable = openPosition;
+            // Settle surplus to other rToken-Holders or the Protocol Owner.
+            _settleSurplus(surplus, redeemable);
+        } else {
+            // Update accounting for total redeemed Underlying Tokens.
+            redeemed[msg.sender] = redeemedLast + redeemable;
+            redeemablePerRTokenLast[msg.sender] = redeemablePerRTokenGlobal;
+
+            // Update accounting for newly deposited rTokens.
+            _mint(msg.sender, amount);
+        }
+
+        // Reentrancy: Transfer the Underlying Tokens after logic.
+        _redeemUnderlying(msg.sender, redeemable);
+    }
+
+    /**
+     * @notice Withdraws (unwraps) Recovery Tokens.
+     * @param amount The non-redeemed rTokens withdrawn.
+     * @dev Holders of Recovery Tokens need to deposit the tokens in this contract before
+     * they can redeem the Recovery Tokens for redeemed Underlying Tokens.
+     */
+    function withdrawRecoveryTokens(uint256 amount) external isActive {
+        require(amount != 0, "WRT: ZERO_AMOUNT");
+
+        // Cache token balances.
+        uint256 initialBalance = balanceOf[msg.sender];
+        uint256 redeemedLast = redeemed[msg.sender];
+        uint256 openPosition = initialBalance - redeemedLast;
+
+        // Calculate the redeemable underlying tokens since the last redemption.
+        uint256 redeemable =
+            initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[msg.sender], 10e18);
+
+        if (openPosition <= redeemable) {
+            // Updated balance of redeemed Underlying Tokens, even before withdrawing rTokens,
+            // exceeds the non-redeemed rTokens.
+            // -> Close the position and settle surplus rTokens.
+            _closeRecoveredPosition(msg.sender);
+            uint256 surplus = redeemable - openPosition;
+            redeemable = openPosition;
+            // Settle surplus to other rToken-Holders or the Protocol Owner.
+            _settleSurplus(surplus, redeemable);
+        } else {
+            if (openPosition - redeemable <= amount) {
+                // Updated balance of redeemed Underlying Tokens, after withdrawing rTokens
+                // exceeds the non-redeemed rTokens.
+                // -> Close the position and withdraw the remaining rTokens.
+                _closeRecoveredPosition(msg.sender);
+                amount = openPosition - redeemable;
+                // Check if there is surplus to settle to the Protocol Owner.
+                _settleSurplus(0, redeemable);
+            } else {
+                // Update accounting for total redeemed Underlying Tokens.
+                redeemed[msg.sender] = redeemedLast + redeemable;
+                redeemablePerRTokenLast[msg.sender] = redeemablePerRTokenGlobal;
+
+                // Update accounting for withdrawn rTokens.
+                _burn(msg.sender, amount);
+            }
+
+            // Withdraw the Recovery Tokens to the owner.
+            recoveryToken.transfer(msg.sender, amount);
+        }
+
+        // Reentrancy: Transfer the Underlying Tokens after logic.
+        _redeemUnderlying(msg.sender, redeemable);
+    }
+
+    /**
+     * @notice Returns the current maximum amount of Recovery Tokens that can be redeemed for Underlying Tokens.
+     * @param owner_ The owner of the wrapped Recovery Tokens.
+     */
+    function maxRedeemable(address owner_) public view returns (uint256 redeemable) {
+        // Calculate the redeemable underlying tokens since the last redemption.
+        redeemable = balanceOf[owner_].mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 10e18);
+
+        // Calculate the open position.
+        uint256 openPosition = balanceOf[owner_] - redeemed[owner_];
+
+        // Return Minimum.
+        redeemable = openPosition <= redeemable ? openPosition : redeemable;
+    }
+
+    /**
+     * @notice Returns the amount of Recovery Tokens that can be redeemed for Underlying Tokens without taking into account restrictions.
+     * @param owner_ The owner of the wrapped Recovery Tokens.
+     */
+    function previewRedeemable(address owner_) public view returns (uint256 redeemable) {
+        // Calculate the redeemable underlying tokens since the last redemption.
+        redeemable = balanceOf[owner_].mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 10e18);
+    }
+
+    /**
+     * @notice Logic to close a fully recovered position.
+     * @param owner_ The owner of the fully recovered position.
+     */
+    function _closeRecoveredPosition(address owner_) internal {
+        redeemed[owner_] = 0;
+        redeemablePerRTokenLast[owner_] = 0;
+        _burn(owner_, balanceOf[owner_]);
+    }
+
+    /**
+     * @notice Logic to redeem Recovery Tokens for Underlying Tokens.
+     * @param to The receiver of the Underlying Tokens.
+     * @param amount The amount of tokens redeemed.
+     * @dev Recovery Tokens are redeemed one-to-one for Underlying Tokens.
+     */
+    function _redeemUnderlying(address to, uint256 amount) internal {
+        // Burn the redeemed recovery tokens.
+        recoveryToken.burn(amount);
+        // Send equal amount of underlying assets.
+        // Reentrancy: Transfer the Underlying Tokens after logic.
+        ERC20(underlying).safeTransfer(to, amount);
+    }
+
+    /**
+     * @notice Logic to settle any surplus Recovery Tokens after a position is closed.
+     * @param surplus The amount of surplus Recovery Tokens.
+     * @param redeemable The amount of Underlying Tokens that are redeemed.
+     */
+    function _settleSurplus(uint256 surplus, uint256 redeemable) internal {
+        if (totalSupply != 0) {
+            // Not all positions are recovered, distribute the surplus to other rToken-Holders.
+            _distributeUnderlying(surplus);
+        } else {
+            // All positions are recovered, send any remaining Underlying Tokens back to the Protocol Owner.
+            ERC20(underlying).safeTransfer(owner, ERC20(underlying).balanceOf(address(this)) - redeemable);
+        }
+    }
+
+    /**
+     * @notice Calculates and updates the growth of Underlying Tokens redeemed per Wrapped Recovery Token.
+     * @param amount The amount of redeemed Underlying Tokens.
+     */
+    function _distributeUnderlying(uint256 amount) internal {
+        if (amount != 0) redeemablePerRTokenGlobal += amount.mulDivDown(10e18, totalSupply);
     }
 
     /*//////////////////////////////////////////////////////////////
