@@ -57,9 +57,9 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         vm.assume(unprivilegedAddress != address(recoveryController));
 
         // When: Caller mints "amount".
-        // Then: Transaction should revert with "UNAUTHORIZED".
+        // Then: Transaction should revert with "NotRecoveryController".
         vm.prank(unprivilegedAddress);
-        vm.expectRevert("UNAUTHORIZED");
+        vm.expectRevert(NotRecoveryController.selector);
         recoveryTokenExtension.mint(amount);
     }
 
@@ -120,9 +120,9 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
 
         // When: "unprivilegedAddress" burns "amount" of "aggrievedUser".
-        // Then: Transaction should revert with "UNAUTHORIZED".
+        // Then: Transaction should revert with "NotRecoveryController".
         vm.prank(unprivilegedAddress);
-        vm.expectRevert("UNAUTHORIZED");
+        vm.expectRevert(NotRecoveryController.selector);
         recoveryTokenExtension.burn(aggrievedUser, amount);
     }
 

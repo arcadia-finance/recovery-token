@@ -52,7 +52,23 @@ contract RecoveryController is ERC20, Owned {
                                ERRORS
     //////////////////////////////////////////////////////////////*/
 
-    error NotAllowed();
+    // Thrown if the Contract is not active.
+    error NotActive();
+
+    // Thrown if the Contract is active.
+    error Active();
+
+    // Thrown on transfers.
+    error NoTransfersAllowed();
+
+    // Thrown if arrays are not equal in length..
+    error LengthMismatch();
+
+    // Thrown when trying to deposit zero assets.
+    error DepositAmountZero();
+
+    // Thrown when trying to withdraw zero assets.
+    error WithdrawAmountZero();
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -62,7 +78,7 @@ contract RecoveryController is ERC20, Owned {
      * @dev Throws if the contract is not active.
      */
     modifier isActive() {
-        require(active, "NOT_ACTIVE");
+        if (!active) revert NotActive();
 
         _;
     }
@@ -71,7 +87,7 @@ contract RecoveryController is ERC20, Owned {
      * @dev Throws if the contract is active.
      */
     modifier notActive() {
-        require(!active, "ACTIVE");
+        if (active) revert Active();
 
         _;
     }
@@ -112,7 +128,7 @@ contract RecoveryController is ERC20, Owned {
      * @dev No transfer allowed.
      */
     function transfer(address, uint256) public pure override returns (bool) {
-        revert NotAllowed();
+        revert NoTransfersAllowed();
     }
 
     /**
@@ -120,7 +136,7 @@ contract RecoveryController is ERC20, Owned {
      * @dev No transferFrom allowed.
      */
     function transferFrom(address, address, uint256) public pure override returns (bool) {
-        revert NotAllowed();
+        revert NoTransfersAllowed();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -151,7 +167,7 @@ contract RecoveryController is ERC20, Owned {
         uint256 length = tos.length;
         uint256 totalAmount;
 
-        require(length == amounts.length, "LENGTH_MISMATCH");
+        if (length != amounts.length) revert LengthMismatch();
 
         uint256 amount;
         for (uint256 i; i < length;) {
@@ -198,7 +214,8 @@ contract RecoveryController is ERC20, Owned {
      */
     function batchBurn(address[] calldata froms, uint256[] calldata amounts) external onlyOwner {
         uint256 length = froms.length;
-        require(length == amounts.length, "LENGTH_MISMATCH");
+
+        if (length != amounts.length) revert LengthMismatch();
 
         address from;
         uint256 openPosition;
@@ -237,7 +254,7 @@ contract RecoveryController is ERC20, Owned {
      * @param amount The amount of underlying tokens deposited.
      */
     function depositUnderlying(uint256 amount) external isActive {
-        require(amount != 0, "DU: ZERO_AMOUNT");
+        if (amount == 0) revert DepositAmountZero();
 
         _distributeUnderlying(amount);
         ERC20(underlying).safeTransferFrom(msg.sender, address(this), amount);
@@ -282,7 +299,7 @@ contract RecoveryController is ERC20, Owned {
      * they can redeem the Recovery Tokens for redeemed Underlying Tokens.
      */
     function depositRecoveryTokens(uint256 amount) external isActive {
-        require(amount != 0, "DRT: ZERO_AMOUNT");
+        if (amount == 0) revert DepositAmountZero();
 
         // Cache token balances.
         uint256 initialBalance = balanceOf[msg.sender];
@@ -330,7 +347,7 @@ contract RecoveryController is ERC20, Owned {
      * they can redeem the Recovery Tokens for redeemed Underlying Tokens.
      */
     function withdrawRecoveryTokens(uint256 amount) external isActive {
-        require(amount != 0, "WRT: ZERO_AMOUNT");
+        if (amount == 0) revert WithdrawAmountZero();
 
         // Cache token balances.
         uint256 initialBalance = balanceOf[msg.sender];

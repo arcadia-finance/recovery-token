@@ -6,5 +6,25 @@ pragma solidity ^0.8.13;
 
 /// @notice Abstract contract containing all the errors emitted by the protocol.
 abstract contract Errors {
-    error NotAllowed();
+    /*//////////////////////////////////////////////////////////////
+                            RECOVERY TOKEN
+    //////////////////////////////////////////////////////////////*/
+
+    error NotRecoveryController();
+
+    /*//////////////////////////////////////////////////////////////
+                        RECOVERY CONTROLLER
+    //////////////////////////////////////////////////////////////*/
+
+    error NotActive();
+
+    error Active();
+
+    error NoTransfersAllowed();
+
+    error LengthMismatch();
+
+    error DepositAmountZero();
+
+    error WithdrawAmountZero();
 }
