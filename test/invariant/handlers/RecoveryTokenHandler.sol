@@ -5,47 +5,50 @@
 pragma solidity ^0.8.13;
 
 import {BaseHandler, SharedHandlerState} from "./BaseHandler.sol";
-import {ERC20} from "../../../lib/solmate/src/tokens/ERC20.sol";
 import {RecoveryToken} from "../../../src/RecoveryToken.sol";
-import {RecoveryController} from "../../../src/RecoveryController.sol";
+import "../../utils/Constants.sol";
 
 /// @dev This contract and not { Factory } is exposed to Foundry for invariant testing. The point is
 /// to bound and restrict the inputs that get passed to the real-world contract to avoid getting reverts.
-abstract contract RecoveryControllerHandler is BaseHandler {
+contract RecoveryTokenHandler is BaseHandler {
     /*//////////////////////////////////////////////////////////////////////////
                                      VARIABLES
-    //////////////////////////////////////////////////////////////////////////*/
-
-    ERC20 internal underlyingToken;
-    RecoveryToken internal recoveryToken;
-    RecoveryController internal recoveryController;
-    ERC20 internal wrappedRecoveryToken;
-
-    /*//////////////////////////////////////////////////////////////////////////
-                                GHOST VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
 
     /*//////////////////////////////////////////////////////////////////////////
                                    TEST CONTRACTS
     //////////////////////////////////////////////////////////////////////////*/
 
+    RecoveryToken internal recoveryToken;
+
     /*//////////////////////////////////////////////////////////////////////////
                                     CONSTRUCTOR
     //////////////////////////////////////////////////////////////////////////*/
 
-    constructor(
-        SharedHandlerState state_,
-        ERC20 underlyingToken_,
-        RecoveryToken recoveryToken_,
-        RecoveryController recoveryController_
-    ) BaseHandler(state_) {
-        underlyingToken = underlyingToken_;
+    constructor(SharedHandlerState state_, RecoveryToken recoveryToken_) BaseHandler(state_) {
         recoveryToken = recoveryToken_;
-        recoveryController = recoveryController_;
-        wrappedRecoveryToken = ERC20(address(recoveryController));
     }
 
     /*//////////////////////////////////////////////////////////////////////////
                                     FUNCTIONS
     //////////////////////////////////////////////////////////////////////////*/
+
+    function transfer(uint256 actorIndexSeed0, uint256 actorIndexSeed1, uint256 amount) external {
+        address from = state.getActor(actorIndexSeed0);
+        address to = state.getActor(actorIndexSeed1);
+
+        amount = bound(amount, 0, recoveryToken.balanceOf(from));
+
+        vm.prank(from);
+        recoveryToken.transfer(to, amount);
+    }
+
+    function burn(uint256 actorIndexSeed, uint256 amount) external {
+        address actor = state.getActor(actorIndexSeed);
+
+        amount = bound(amount, 0, recoveryToken.balanceOf(actor));
+
+        vm.prank(actor);
+        recoveryToken.burn(amount);
+    }
 }

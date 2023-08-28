@@ -7,8 +7,10 @@ pragma solidity ^0.8.13;
 import {StdStorage, stdStorage} from "../../lib/forge-std/src/Test.sol";
 import {stdError} from "../../lib/forge-std/src/StdError.sol";
 import {FixedPointMathLib} from "../../lib/solmate/src/utils/FixedPointMathLib.sol";
-
+import {UserState, ControllerState} from "../utils/Types.sol";
 import {Integration_Test} from "./Integration.t.sol";
+import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
+import {RecoveryToken} from "../../src/RecoveryToken.sol";
 import {RecoveryControllerExtension} from "../utils/Extensions.sol";
 
 contract RecoveryController_Integration_Test is Integration_Test {
@@ -22,34 +24,29 @@ contract RecoveryController_Integration_Test is Integration_Test {
                             TEST CONTRACTS
     /////////////////////////////////////////////////////////////// */
 
+    RecoveryControllerExtension internal recoveryControllerExtension;
+
     /* ///////////////////////////////////////////////////////////////
                               SETUP
     /////////////////////////////////////////////////////////////// */
 
     function setUp() public virtual override {
         Integration_Test.setUp();
+
+        // Deploy Recovery contracts.
+        vm.prank(users.creator);
+        recoveryControllerExtension = new RecoveryControllerExtension(address(underlyingToken));
+        recoveryToken = RecoveryToken(recoveryControllerExtension.recoveryToken());
+        wrappedRecoveryToken = ERC20(address(recoveryControllerExtension));
+
+        // Label the contracts.
+        vm.label({account: address(recoveryToken), newLabel: "RecoveryToken"});
+        vm.label({account: address(recoveryControllerExtension), newLabel: "RecoveryController"});
     }
 
     /* ///////////////////////////////////////////////////////////////
                         HELPER FUNCTIONS
     /////////////////////////////////////////////////////////////// */
-
-    struct UserState {
-        address addr;
-        uint256 redeemed;
-        uint256 redeemablePerRTokenLast;
-        uint256 balanceWRT;
-        uint256 balanceRT;
-        uint256 balanceUT;
-    }
-
-    struct ControllerState {
-        bool active;
-        uint256 redeemablePerRTokenGlobal;
-        uint256 supplyWRT;
-        uint256 balanceRT;
-        uint256 balanceUT;
-    }
 
     function givenValidActiveState(UserState memory user, ControllerState memory controller)
         public
@@ -96,11 +93,11 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
     function setUserState(UserState memory user) public {
         // Set redeemed tokens.
-        stdstore.target(address(recoveryController)).sig(recoveryController.redeemed.selector).with_key(user.addr)
-            .checked_write(user.redeemed);
+        stdstore.target(address(recoveryControllerExtension)).sig(recoveryControllerExtension.redeemed.selector)
+            .with_key(user.addr).checked_write(user.redeemed);
 
         // Set redeemablePerRTokenLast of last interaction user.
-        recoveryController.setRedeemablePerRTokenLast(user.addr, user.redeemablePerRTokenLast);
+        recoveryControllerExtension.setRedeemablePerRTokenLast(user.addr, user.redeemablePerRTokenLast);
 
         // Set token balances.
         deal(address(wrappedRecoveryToken), user.addr, user.balanceWRT);
@@ -110,11 +107,12 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
     function setControllerState(ControllerState memory controller) public {
         // Set activation.
-        recoveryController.setActive(controller.active);
+        recoveryControllerExtension.setActive(controller.active);
 
         // Set latest "redeemablePerRTokenGlobal".
-        stdstore.target(address(recoveryController)).sig(recoveryController.redeemablePerRTokenGlobal.selector)
-            .checked_write(controller.redeemablePerRTokenGlobal);
+        stdstore.target(address(recoveryControllerExtension)).sig(
+            recoveryControllerExtension.redeemablePerRTokenGlobal.selector
+        ).checked_write(controller.redeemablePerRTokenGlobal);
 
         // Set "totalSupply" of "wrappedRecoveryToken"
         stdstore.target(address(wrappedRecoveryToken)).sig(wrappedRecoveryToken.totalSupply.selector).checked_write(
@@ -122,8 +120,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
         );
 
         // Set token balances.
-        deal(address(recoveryToken), address(recoveryController), controller.balanceRT);
-        deal(address(underlyingToken), address(recoveryController), controller.balanceUT);
+        deal(address(recoveryToken), address(recoveryControllerExtension), controller.balanceRT);
+        deal(address(underlyingToken), address(recoveryControllerExtension), controller.balanceUT);
     }
 
     function calculateRedeemableAndOpenAmount(UserState memory user, ControllerState memory controller)
@@ -178,7 +176,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
                         ACTIVATION LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function testFuzz_Revert_activate_(address unprivilegedAddress) public {
+    function testFuzz_Revert_activate(address unprivilegedAddress) public {
         // Given: Caller is not the "owner".
         vm.assume(unprivilegedAddress != users.owner);
 
@@ -186,17 +184,17 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
-        recoveryController.activate();
+        recoveryControllerExtension.activate();
     }
 
     function test_activate() public {
         // Given:
         // When: "unprivilegedAddress" calls "activate".
         vm.prank(users.owner);
-        recoveryController.activate();
+        recoveryControllerExtension.activate();
 
         // Then "RecoveryController" is active.
-        assertTrue(recoveryController.active());
+        assertTrue(recoveryControllerExtension.active());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -207,13 +205,13 @@ contract RecoveryController_Integration_Test is Integration_Test {
         public
     {
         // Given "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryController), aggrievedUser, initialBalance);
+        deal(address(recoveryControllerExtension), aggrievedUser, initialBalance);
 
         // When: "aggrievedUser" transfers "amount" to "to".
         // Then: Transaction should revert with "NotAllowed".
         vm.prank(aggrievedUser);
         vm.expectRevert(NotAllowed.selector);
-        recoveryController.transfer(to, amount);
+        recoveryControllerExtension.transfer(to, amount);
     }
 
     function testFuzz_Revert_transferFrom(
@@ -225,16 +223,16 @@ contract RecoveryController_Integration_Test is Integration_Test {
         uint256 amount
     ) public {
         // Given "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryController), aggrievedUser, initialBalance);
+        deal(address(recoveryControllerExtension), aggrievedUser, initialBalance);
         // And: "caller" has allowance of "allowance" from "aggrievedUser"
         vm.prank(aggrievedUser);
-        recoveryController.approve(caller, allowance);
+        recoveryControllerExtension.approve(caller, allowance);
 
         // When: "caller" transfers "amount" from "aggrievedUser" to "to".
         // Then: Transaction should revert with "NotAllowed".
         vm.prank(caller);
         vm.expectRevert(NotAllowed.selector);
-        recoveryController.transferFrom(aggrievedUser, to, amount);
+        recoveryControllerExtension.transferFrom(aggrievedUser, to, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -249,19 +247,19 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
-        recoveryController.mint(to, amount);
+        recoveryControllerExtension.mint(to, amount);
     }
 
     function testFuzz_Revert_mint_Active(address to, uint256 amount) public {
         // Given: "RecoveryController" is active.
         vm.prank(users.owner);
-        recoveryController.activate();
+        recoveryControllerExtension.activate();
 
         // When: "owner" mints "amount" to "to".
         // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(users.owner);
         vm.expectRevert("ACTIVE");
-        recoveryController.mint(to, amount);
+        recoveryControllerExtension.mint(to, amount);
     }
 
     function testFuzz_mint(address to, uint256 initialBalanceTo, uint256 initialBalanceController, uint256 amount)
@@ -275,16 +273,16 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // And: "to" has "initialBalanceTo" of "wrappedRecoveryToken".
         deal(address(wrappedRecoveryToken), to, initialBalanceTo);
         // And: "recoveryController" has "initialBalanceController" of "recoveryToken".
-        deal(address(recoveryToken), address(recoveryController), initialBalanceController);
+        deal(address(recoveryToken), address(recoveryControllerExtension), initialBalanceController);
 
         // When: "owner" mints "amount" to "to".
         vm.prank(users.owner);
-        recoveryController.mint(to, amount);
+        recoveryControllerExtension.mint(to, amount);
 
         // Then: "wrappedRecoveryToken" balance of "to" should increase with "amount".
         assertEq(wrappedRecoveryToken.balanceOf(to), initialBalanceTo + amount);
         // And: "recoveryToken" balance of "recoveryController" should increase with "amount".
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), initialBalanceController + amount);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), initialBalanceController + amount);
     }
 
     function testFuzz_Revert_batchMint_NonOwner(
@@ -303,7 +301,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
-        recoveryController.batchMint(tos_, amounts_);
+        recoveryControllerExtension.batchMint(tos_, amounts_);
     }
 
     function testFuzz_Revert_batchMint_Active(address[2] calldata tos, uint256[2] calldata amounts) public {
@@ -313,13 +311,13 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // Given: "RecoveryController" is active.
         vm.prank(users.owner);
-        recoveryController.activate();
+        recoveryControllerExtension.activate();
 
         // When: "owner" mints "amount" to "to".
         // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(users.owner);
         vm.expectRevert("ACTIVE");
-        recoveryController.batchMint(tos_, amounts_);
+        recoveryControllerExtension.batchMint(tos_, amounts_);
     }
 
     function testFuzz_batchMint(
@@ -347,18 +345,18 @@ contract RecoveryController_Integration_Test is Integration_Test {
             deal(address(wrappedRecoveryToken), tos_[i], initialBalanceTos[i]);
         }
         // And: "recoveryController" has "initialBalanceController" of "recoveryToken".
-        deal(address(recoveryToken), address(recoveryController), initialBalanceController);
+        deal(address(recoveryToken), address(recoveryControllerExtension), initialBalanceController);
 
         // When: "owner" mints "amounts" to "tos".
         vm.prank(users.owner);
-        recoveryController.batchMint(tos_, amounts_);
+        recoveryControllerExtension.batchMint(tos_, amounts_);
 
         // Then: "wrappedRecoveryToken" balance of each "tos[i]" should increase with "amounts[i]".
         for (uint256 i; i < tos_.length; ++i) {
             assertEq(wrappedRecoveryToken.balanceOf(tos_[i]), initialBalanceTos_[i] + amounts_[i]);
         }
         // And: "recoveryToken" balance of "recoveryController" should increase with sum of all "amounts".
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), expectedBalanceController);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), expectedBalanceController);
     }
 
     function testFuzz_Revert_burn_NonOwner(address unprivilegedAddress, address from, uint256 amount) public {
@@ -369,30 +367,61 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
-        recoveryController.burn(from, amount);
+        recoveryControllerExtension.burn(from, amount);
     }
 
-    function testFuzz_burn(address from, uint256 initialBalanceFrom, uint256 initialBalanceController, uint256 amount)
+    function testFuzz_burn_PositionPartiallyClosed(UserState memory user, uint256 amount, uint256 controllerBalanceRT)
         public
     {
-        // Given: "RecoveryController" is not active.
-        // And: "amount" is smaller or equal to "initialBalanceFrom".
-        vm.assume(amount <= initialBalanceFrom);
-        // And: "initialBalanceFrom" is smaller or equal to "initialBalanceController" (Invariant!).
-        vm.assume(initialBalanceFrom <= initialBalanceController);
-        // And: "from" has "initialBalanceFrom" of "wrappedRecoveryToken".
-        deal(address(wrappedRecoveryToken), from, initialBalanceFrom);
-        // And: "recoveryController" has "initialBalanceController" of "recoveryToken".
-        deal(address(recoveryToken), address(recoveryController), initialBalanceController);
+        // Given: "amount" is strictly smaller as "openPosition" (test-condition PositionPartiallyClosed).
+        // -> userBalanceWRT is also at least 1.
+        user.balanceWRT = bound(user.balanceWRT, 1, type(uint256).max);
+        user.redeemed = bound(user.redeemed, 0, user.balanceWRT - 1); // Invariant.
+        uint256 openPosition = user.balanceWRT - user.redeemed;
+        amount = bound(amount, 0, openPosition - 1);
+
+        // And: "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
+        controllerBalanceRT = bound(controllerBalanceRT, openPosition, type(uint256).max);
+
+        // And: State is persisted.
+        setUserState(user);
+        deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
 
         // When: "owner" burns "amount" from "from".
         vm.prank(users.owner);
-        recoveryController.burn(from, amount);
+        recoveryControllerExtension.burn(user.addr, amount);
 
-        // Then: "wrappedRecoveryToken" balance of "from" should decrease with "amount".
-        assertEq(wrappedRecoveryToken.balanceOf(from), initialBalanceFrom - amount);
+        // Then: "wrappedRecoveryToken" balance of "user" should decrease with "amount".
+        assertEq(wrappedRecoveryToken.balanceOf(user.addr), user.balanceWRT - amount);
         // And: "recoveryToken" balance of "recoveryController" should decrease with "amount".
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), initialBalanceController - amount);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - amount);
+    }
+
+    function testFuzz_burn_PositionFullyClosed(UserState memory user, uint256 amount, uint256 controllerBalanceRT)
+        public
+    {
+        // Given: "amount" is greater or equal as "openPosition" (test-condition PositionPartiallyClosed).
+        user.redeemed = bound(user.redeemed, 0, user.balanceWRT); // Invariant.
+        uint256 openPosition = user.balanceWRT - user.redeemed;
+        amount = bound(amount, openPosition, type(uint256).max);
+
+        // And: "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
+        controllerBalanceRT = bound(controllerBalanceRT, openPosition, type(uint256).max);
+
+        // And: State is persisted.
+        setUserState(user);
+        deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
+
+        // When: "owner" burns "amount" from "from".
+        vm.prank(users.owner);
+        recoveryControllerExtension.burn(user.addr, amount);
+
+        // Then: "aggrievedUser" state variables are updated.
+        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
+        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
+        // And: "recoveryToken" balance of "recoveryController" should decrease with "openPosition".
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - openPosition);
     }
 
     function testFuzz_Revert_batchBurn_NonOwner(
@@ -411,51 +440,111 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
-        recoveryController.batchBurn(froms_, amounts_);
+        recoveryControllerExtension.batchBurn(froms_, amounts_);
     }
 
-    function testFuzz_batchBurn(
-        address[2] calldata froms,
-        uint256[2] calldata initialBalanceFroms,
-        uint256 initialBalanceController,
-        uint256[2] calldata amounts
+    function testFuzz_batchBurn_PositionPartiallyClosed(
+        UserState[2] calldata froms,
+        uint256[2] calldata amounts,
+        uint256 controllerBalanceRT
     ) public {
-        // Cast between fixed size arrays and dynamic size array.
-        address[] memory froms_ = castArrayFixedToDynamic(froms);
-        uint256[] memory initialBalanceFroms_ = castArrayFixedToDynamic(initialBalanceFroms);
+        UserState[] memory froms_ = castArrayFixedToDynamicUserState(froms);
         uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
-        vm.assume(uniqueAddresses(froms_));
+        vm.assume(uniqueUsers(froms_));
 
-        // Given: "RecoveryController" is not active.
-        // And: Each "amounts[i]" is smaller or equal to "initialBalanceFroms[i]".
+        // Cache variables.
+        uint256 length = froms_.length;
         uint256 totalAmount;
-        uint256 totalInitialBalanceFrom;
-        for (uint256 i; i < froms_.length; ++i) {
-            vm.assume(amounts[i] <= initialBalanceFroms_[i]);
-            // totalInitialBalanceFrom can't be higher as type(uint256).max.
-            vm.assume(initialBalanceFroms_[i] <= type(uint256).max - totalInitialBalanceFrom);
-            totalInitialBalanceFrom += initialBalanceFroms_[i];
-            totalAmount += amounts[i];
+        uint256 totalOpenPosition;
+        address[] memory fromAddrs = new address[](length);
+
+        // Given: Each "amounts[i]" is strictly smaller as "openPosition[i]" (test-condition PositionPartiallyClosed).
+        // -> Each userBalanceWRT is also at least 1.
+        for (uint256 i; i < length; ++i) {
+            fromAddrs[i] = froms_[i].addr;
+
+            froms_[i].balanceWRT = bound(froms_[i].balanceWRT, 1, type(uint256).max);
+            froms_[i].redeemed = bound(froms_[i].redeemed, 0, froms_[i].balanceWRT - 1); // Invariant.
+            uint256 openPosition = froms_[i].balanceWRT - froms_[i].redeemed;
+            amounts_[i] = bound(amounts_[i], 0, openPosition - 1);
+
+            // totalOpenPosition can't be higher as type(uint256).max.
+            vm.assume(froms_[i].balanceWRT <= type(uint256).max - totalOpenPosition);
+            totalOpenPosition += openPosition;
+            totalAmount += amounts_[i];
         }
-        // And: Total "initialBalanceFroms" is smaller or equal to "initialBalanceController" (Invariant!).
-        vm.assume(totalInitialBalanceFrom <= initialBalanceController);
-        // And: "froms" have "initialBalanceFroms" of "wrappedRecoveryToken".
-        for (uint256 i; i < froms_.length; ++i) {
-            deal(address(wrappedRecoveryToken), froms_[i], initialBalanceFroms_[i]);
+
+        // And: Total "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
+        controllerBalanceRT = bound(controllerBalanceRT, totalOpenPosition, type(uint256).max);
+
+        // And: State is persisted.
+        for (uint256 i; i < length; ++i) {
+            setUserState(froms_[i]);
         }
-        // And: "recoveryController" has "initialBalanceController" of "recoveryToken".
-        deal(address(recoveryToken), address(recoveryController), initialBalanceController);
+        deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
 
         // When: "owner" burns "amounts" from "froms".
         vm.prank(users.owner);
-        recoveryController.batchBurn(froms_, amounts_);
+        recoveryControllerExtension.batchBurn(fromAddrs, amounts_);
 
         // Then: "wrappedRecoveryToken" balance of each "froms[i]" should decrease with "amounts[i]".
         for (uint256 i; i < froms_.length; ++i) {
-            assertEq(wrappedRecoveryToken.balanceOf(froms_[i]), initialBalanceFroms_[i] - amounts_[i]);
+            assertEq(wrappedRecoveryToken.balanceOf(froms_[i].addr), froms_[i].balanceWRT - amounts_[i]);
         }
         // And: "recoveryToken" balance of "recoveryController" should decrease with sum of all "amounts".
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), initialBalanceController - totalAmount);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - totalAmount);
+    }
+
+    function testFuzz_batchBurn_PositionFullyClosed(
+        UserState[2] calldata froms,
+        uint256[2] calldata amounts,
+        uint256 controllerBalanceRT
+    ) public {
+        UserState[] memory froms_ = castArrayFixedToDynamicUserState(froms);
+        uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
+        vm.assume(uniqueUsers(froms_));
+
+        // Cache variables.
+        uint256 length = froms_.length;
+        uint256 totalOpenPosition;
+        address[] memory fromAddrs = new address[](length);
+
+        // Given: Each "amounts[i]" is greater or equal as "openPosition[i]" (test-condition PositionPartiallyClosed).
+        // -> Each userBalanceWRT is also at least 1.
+        for (uint256 i; i < length; ++i) {
+            fromAddrs[i] = froms_[i].addr;
+
+            froms_[i].balanceWRT = bound(froms_[i].balanceWRT, 1, type(uint256).max);
+            froms_[i].redeemed = bound(froms_[i].redeemed, 0, froms_[i].balanceWRT - 1); // Invariant.
+            uint256 openPosition = froms_[i].balanceWRT - froms_[i].redeemed;
+            amounts_[i] = bound(amounts_[i], openPosition, type(uint256).max);
+
+            // totalOpenPosition can't be higher as type(uint256).max.
+            vm.assume(froms_[i].balanceWRT <= type(uint256).max - totalOpenPosition);
+            totalOpenPosition += openPosition;
+        }
+
+        // And: Total "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
+        controllerBalanceRT = bound(controllerBalanceRT, totalOpenPosition, type(uint256).max);
+
+        // And: State is persisted.
+        for (uint256 i; i < length; ++i) {
+            setUserState(froms_[i]);
+        }
+        deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
+
+        // When: "owner" burns "amounts" from "froms".
+        vm.prank(users.owner);
+        recoveryControllerExtension.batchBurn(fromAddrs, amounts_);
+
+        // Then: "wrappedRecoveryToken" balance of each "froms[i]" should decrease with "amounts[i]".
+        for (uint256 i; i < froms_.length; ++i) {
+            assertEq(wrappedRecoveryToken.balanceOf(froms_[i].addr), 0);
+            assertEq(recoveryControllerExtension.redeemed(froms_[i].addr), 0);
+            assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(froms_[i].addr), 0);
+        }
+        // And: "recoveryToken" balance of "recoveryController" should decrease with sum of all "openPosition".
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - totalOpenPosition);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -474,27 +563,64 @@ contract RecoveryController_Integration_Test is Integration_Test {
         redeemablePerRTokenGlobal = bound(redeemablePerRTokenGlobal, 0, type(uint256).max - delta);
 
         // And: State is persisted.
-        stdstore.target(address(recoveryController)).sig(recoveryController.redeemablePerRTokenGlobal.selector)
-            .checked_write(redeemablePerRTokenGlobal);
-        stdstore.target(address(recoveryController)).sig(recoveryController.totalSupply.selector).checked_write(
-            supplyWRT
-        );
+        stdstore.target(address(recoveryControllerExtension)).sig(
+            recoveryControllerExtension.redeemablePerRTokenGlobal.selector
+        ).checked_write(redeemablePerRTokenGlobal);
+        stdstore.target(address(recoveryControllerExtension)).sig(recoveryControllerExtension.totalSupply.selector)
+            .checked_write(supplyWRT);
 
         // When: "amount" of "underlyingToken" is distributed.
-        recoveryController.distributeUnderlying(amount);
+        recoveryControllerExtension.distributeUnderlying(amount);
 
         // Then: "redeemablePerRTokenGlobal" is increased with "delta".
-        assertEq(recoveryController.redeemablePerRTokenGlobal(), redeemablePerRTokenGlobal + delta);
+        assertEq(recoveryControllerExtension.redeemablePerRTokenGlobal(), redeemablePerRTokenGlobal + delta);
     }
 
-    function testFuzz_Revert_depositUnderlying_NotActive(address caller, uint256 amount) public {
+    function testFuzz_Revert_depositUnderlying_NotActive(address depositor, uint256 amount) public {
         // Given: "RecoveryController" is not active.
 
-        // When: "caller" calls "redeemUnderlying".
+        // When: A "depositor" deposits "amount" of "underlyingToken".
         // Then: Transaction should revert with "NOT_ACTIVE".
-        vm.prank(caller);
+        vm.prank(depositor);
         vm.expectRevert("NOT_ACTIVE");
-        recoveryController.depositUnderlying(amount);
+        recoveryControllerExtension.depositUnderlying(amount);
+    }
+
+    function testFuzz_Revert_depositUnderlying_ZeroAmount(address depositor) public {
+        // Given: "RecoveryController" is active.
+        recoveryControllerExtension.setActive(true);
+
+        // When: A "depositor" deposits "amount" of "underlyingToken".
+        // Then: Transaction should revert with "NOT_ACTIVE".
+        vm.prank(depositor);
+        vm.expectRevert("DU: ZERO_AMOUNT");
+        recoveryControllerExtension.depositUnderlying(0);
+    }
+
+    function testFuzz_Revert_depositUnderlying_NoOpenPositions(
+        address depositor,
+        uint256 amount,
+        UserState memory user,
+        ControllerState memory controller
+    ) public {
+        // Given: The protocol is active.
+        controller.active = true;
+
+        // And: "amount" is non-zero.
+        vm.assume(amount > 0);
+
+        // And: There are no open positions on the "recoveryController".
+        controller.supplyWRT = 0;
+
+        // And: state is persisted.
+        setUserState(user);
+        setControllerState(controller);
+
+        // When: A "depositor" deposits 0 of "underlyingToken".
+        // Then: Transaction should revert with "" (solmate mulDivDown division by zero).
+        vm.prank(depositor);
+        vm.expectRevert(bytes(""));
+        recoveryControllerExtension.depositUnderlying(amount);
     }
 
     function testFuzz_depositUnderlying(
@@ -504,10 +630,13 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
+
+        // And: "amount" is non-zero.
+        vm.assume(amount > 0);
 
         // And: "depositor" is not "aggrievedUser" or "recoveryController".
-        vm.assume(depositor != address(recoveryController));
+        vm.assume(depositor != address(recoveryControllerExtension));
         vm.assume(depositor != user.addr);
 
         // And: The protocol is active with a random valid state.
@@ -517,10 +646,11 @@ contract RecoveryController_Integration_Test is Integration_Test {
         vm.assume(controller.supplyWRT > 0);
 
         // And: Balance "controller.supplyUT" does not overflow (ERC20 Invariant).
-        amount = bound(amount, 0, type(uint256).max - controller.balanceUT);
+        vm.assume(controller.balanceUT < type(uint256).max);
+        amount = bound(amount, 1, type(uint256).max - controller.balanceUT);
 
         // And: Assume "delta" does not overflow (unrealistic big numbers).
-        amount = bound(amount, 0, type(uint256).max / 10e18);
+        amount = bound(amount, 1, type(uint256).max / 10e18);
         uint256 delta = amount * 10e18 / controller.supplyWRT;
         // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
         vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
@@ -535,25 +665,25 @@ contract RecoveryController_Integration_Test is Integration_Test {
         setControllerState(controller);
 
         // Cache redeemable before call.
-        uint256 userRedeemableLast = recoveryController.previewRedeemable(user.addr);
+        uint256 userRedeemableLast = recoveryControllerExtension.previewRedeemable(user.addr);
 
         // When: A "depositor" deposits "amount" of "underlyingToken".
         deal(address(underlyingToken), depositor, amount);
         vm.startPrank(depositor);
-        underlyingToken.approve(address(recoveryController), amount);
-        recoveryController.depositUnderlying(amount);
+        underlyingToken.approve(address(recoveryControllerExtension), amount);
+        recoveryControllerExtension.depositUnderlying(amount);
         vm.stopPrank();
 
         // Then: "controller" state variables are updated.
-        assertEq(recoveryController.redeemablePerRTokenGlobal(), controller.redeemablePerRTokenGlobal + delta);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT + amount);
+        assertEq(recoveryControllerExtension.redeemablePerRTokenGlobal(), controller.redeemablePerRTokenGlobal + delta);
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT + amount);
 
         // And: The total amount deposited (minus rounding error) is claimable by all rToken Holders.
         uint256 lowerBoundTotal;
         {
             // No direct function on the contract -> calculate actualTotalRedeemable of last deposit.
-            uint256 actualTotalRedeemable = recoveryController.totalSupply()
-                * (recoveryController.redeemablePerRTokenGlobal() - controller.redeemablePerRTokenGlobal) / 10e18;
+            uint256 actualTotalRedeemable = recoveryControllerExtension.totalSupply()
+                * (recoveryControllerExtension.redeemablePerRTokenGlobal() - controller.redeemablePerRTokenGlobal) / 10e18;
             uint256 maxRoundingError = controller.supplyWRT / 10e18 + 1;
             // Lower bound of the error.
             lowerBoundTotal = maxRoundingError < amount ? amount - maxRoundingError : 0;
@@ -564,7 +694,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         }
 
         // And: A proportional share of "amount" is redeemable by "aggrievedUser".
-        uint256 actualUserRedeemable = recoveryController.previewRedeemable(user.addr) - userRedeemableLast;
+        uint256 actualUserRedeemable = recoveryControllerExtension.previewRedeemable(user.addr) - userRedeemableLast;
         // ToDo: use Full Math library proper MulDiv.
         if (user.balanceWRT != 0) vm.assume(amount <= type(uint256).max / user.balanceWRT);
         uint256 lowerBoundUser = lowerBoundTotal.mulDivDown(user.balanceWRT, controller.supplyWRT);
@@ -580,14 +710,14 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Then: Transaction should revert with "NOT_ACTIVE".
         vm.prank(caller);
         vm.expectRevert("NOT_ACTIVE");
-        recoveryController.redeemUnderlying(aggrievedUser);
+        recoveryControllerExtension.redeemUnderlying(aggrievedUser);
     }
 
     function testFuzz_maxRedeemable_NonRecoveredPosition(UserState memory user, ControllerState memory controller)
         public
     {
         // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -601,7 +731,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         setControllerState(controller);
 
         // When: "maxRedeemable" is called for "aggrievedUser".
-        uint256 maxRedeemable = recoveryController.maxRedeemable(user.addr);
+        uint256 maxRedeemable = recoveryControllerExtension.maxRedeemable(user.addr);
 
         // Then: Transaction returns "redeemable".
         assertEq(maxRedeemable, redeemable);
@@ -611,7 +741,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         public
     {
         // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -625,7 +755,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         setControllerState(controller);
 
         // When: "maxRedeemable" is called for "aggrievedUser".
-        uint256 maxRedeemable = recoveryController.maxRedeemable(user.addr);
+        uint256 maxRedeemable = recoveryControllerExtension.maxRedeemable(user.addr);
 
         // Then: Transaction returns "openPosition".
         assertEq(maxRedeemable, openPosition);
@@ -637,7 +767,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -652,16 +782,18 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // When: "caller" calls "redeemUnderlying" for "aggrievedUser".
         vm.prank(caller);
-        recoveryController.redeemUnderlying(user.addr);
+        recoveryControllerExtension.redeemUnderlying(user.addr);
 
         // Then: "aggrievedUser" state variables are updated.
-        assertEq(recoveryController.redeemed(user.addr), user.redeemed + redeemable);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), user.redeemed + redeemable);
+        assertEq(
+            recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal
+        );
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + redeemable);
 
         // And: "controller" state variables are updated.
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - redeemable);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - redeemable);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - redeemable);
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - redeemable);
     }
 
     function testFuzz_redeemUnderlying_FullyRecoveredPosition_LastPosition(
@@ -670,7 +802,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController" or "owner".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
         // And: The protocol is active with a random valid state.
@@ -692,17 +824,17 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // When: "caller" calls "redeemUnderlying" for "aggrievedUser".
         vm.prank(caller);
-        recoveryController.redeemUnderlying(user.addr);
+        recoveryControllerExtension.redeemUnderlying(user.addr);
 
         // Then: "aggrievedUser" position is closed.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
-        assertEq(recoveryController.redeemed(user.addr), 0);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
+        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
 
         // And: "controller" state variables are updated.
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - openPosition);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), 0);
 
         // And: "underlyingToken" balance of "owner" increases with remaining funds.
         assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - openPosition);
@@ -714,7 +846,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController" or "owner".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
         // And: The protocol is active with a random valid state.
@@ -743,18 +875,18 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // When: "caller" calls "redeemUnderlying" for "aggrievedUser".
         vm.prank(caller);
-        recoveryController.redeemUnderlying(user.addr);
+        recoveryControllerExtension.redeemUnderlying(user.addr);
 
         // Then: "aggrievedUser" position is closed.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
-        assertEq(recoveryController.redeemed(user.addr), 0);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
+        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         // And: "aggrievedUser" token balances are updated.
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
 
         // And: "controller" state variables are updated.
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - openPosition);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - openPosition);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - openPosition);
 
         // And: "underlyingToken" balance of "owner" is zero.
         assertEq(underlyingToken.balanceOf(users.owner), 0);
@@ -767,23 +899,23 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Then: Transaction reverts with "NOT_ACTIVE".
         vm.prank(aggrievedUser);
         vm.expectRevert("NOT_ACTIVE");
-        recoveryController.depositRecoveryTokens(amount);
+        recoveryControllerExtension.depositRecoveryTokens(amount);
     }
 
     function testFuzz_Revert_depositRecoveryTokens_ZeroAmount(address aggrievedUser) public {
         // Given: "RecoveryController" is active.
-        recoveryController.setActive(true);
+        recoveryControllerExtension.setActive(true);
 
         // When: "aggrievedUser" calls "depositRecoveryTokens" with 0 amount.
         // Then: Transaction reverts with "DRT: ZERO_AMOUNT".
         vm.prank(aggrievedUser);
         vm.expectRevert("DRT: ZERO_AMOUNT");
-        recoveryController.depositRecoveryTokens(0);
+        recoveryControllerExtension.depositRecoveryTokens(0);
     }
 
     function testFuzz_Revert_depositRecoveryTokens_InsufficientBalance(uint256 amount, UserState memory user) public {
         // Given: "RecoveryController" is active.
-        recoveryController.setActive(true);
+        recoveryControllerExtension.setActive(true);
         // And: "amount" is strictly bigger as "user.balanceRT".
         user.balanceRT = bound(user.balanceRT, 0, type(uint256).max - 1);
         amount = bound(amount, user.balanceRT + 1, type(uint256).max);
@@ -792,7 +924,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Then: Transaction reverts with "arithmeticError".
         vm.prank(user.addr);
         vm.expectRevert(stdError.arithmeticError);
-        recoveryController.depositRecoveryTokens(amount);
+        recoveryControllerExtension.depositRecoveryTokens(amount);
     }
 
     function testFuzz_depositRecoveryTokens_NoInitialPosition(
@@ -801,7 +933,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -822,19 +954,21 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // And: "user" has approved "recoveryController" with at least "amount".
         vm.prank(user.addr);
-        recoveryToken.approve(address(recoveryController), amount);
+        recoveryToken.approve(address(recoveryControllerExtension), amount);
 
         // When: "aggrievedUser" calls "recoveryToken".
         vm.prank(user.addr);
-        recoveryController.depositRecoveryTokens(amount);
+        recoveryControllerExtension.depositRecoveryTokens(amount);
 
         // Then: "aggrievedUser" state variables are updated.
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal);
+        assertEq(
+            recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal
+        );
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT - amount);
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), amount);
 
         // And: "controller" state variables are updated.
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT + amount);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT + amount);
         assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT + amount);
     }
 
@@ -844,7 +978,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -866,23 +1000,27 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // And: "user" has approved "recoveryController" with at least "amount".
         vm.prank(user.addr);
-        recoveryToken.approve(address(recoveryController), amount);
+        recoveryToken.approve(address(recoveryControllerExtension), amount);
 
         // When: "aggrievedUser" calls "recoveryToken".
         vm.prank(user.addr);
-        recoveryController.depositRecoveryTokens(amount);
+        recoveryControllerExtension.depositRecoveryTokens(amount);
 
         // Then: "aggrievedUser" state variables are updated.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), user.balanceWRT + amount);
-        assertEq(recoveryController.redeemed(user.addr), user.redeemed + redeemable);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), user.redeemed + redeemable);
+        assertEq(
+            recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal
+        );
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT - amount);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + redeemable);
 
         // And: "controller" state variables are updated.
         assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT + amount);
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT + amount - redeemable);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - redeemable);
+        assertEq(
+            recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT + amount - redeemable
+        );
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - redeemable);
     }
 
     function testFuzz_depositRecoveryTokens_WithInitialPosition_FullyRecoveredPosition_LastPosition(
@@ -891,7 +1029,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController" or "owner".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
         // And: The protocol is active with a random valid state.
@@ -915,7 +1053,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         controller.supplyWRT = user.balanceWRT;
 
         // And: Assume "surplus" does not overflow (unrealistic big numbers).
-        vm.assume(redeemable <= type(uint256).max - user.redeemed);
+        vm.assume(redeemable <= type(uint256).max - user.redeemed - amount);
 
         // And: State is persisted.
         setUserState(user);
@@ -923,26 +1061,26 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // And: "user" has approved "recoveryController" with at least "amount".
         vm.prank(user.addr);
-        recoveryToken.approve(address(recoveryController), amount);
+        recoveryToken.approve(address(recoveryControllerExtension), amount);
 
         // When: "aggrievedUser" calls "recoveryToken".
         vm.prank(user.addr);
-        recoveryController.depositRecoveryTokens(amount);
+        recoveryControllerExtension.depositRecoveryTokens(amount);
 
         // Then: "aggrievedUser" position is closed.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
-        assertEq(recoveryController.redeemed(user.addr), 0);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
+        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT - amount);
-        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition + amount);
 
         // And: "controller" state variables are updated.
         assertEq(wrappedRecoveryToken.totalSupply(), 0);
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT + amount - openPosition);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), 0);
 
         // And: "underlyingToken" balance of "owner" increases with remaining funds.
-        assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - openPosition);
+        assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - openPosition - amount);
     }
 
     function testFuzz_depositRecoveryTokens_WithInitialPosition_FullyRecoveredPosition_NotLastPosition(
@@ -951,7 +1089,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController" or "owner".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
         // And: The protocol is active with a random valid state.
@@ -990,24 +1128,27 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // And: "user" has approved "recoveryController" with at least "amount".
         vm.prank(user.addr);
-        recoveryToken.approve(address(recoveryController), amount);
+        recoveryToken.approve(address(recoveryControllerExtension), amount);
 
         // When: "aggrievedUser" calls "recoveryToken".
         vm.prank(user.addr);
-        recoveryController.depositRecoveryTokens(amount);
+        recoveryControllerExtension.depositRecoveryTokens(amount);
 
         // Then: "aggrievedUser" position is closed.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
-        assertEq(recoveryController.redeemed(user.addr), 0);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
+        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT - amount);
-        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition + amount);
 
         // And: "controller" state variables are updated.
         assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - user.balanceWRT);
-        assertEq(recoveryController.redeemablePerRTokenGlobal(), controller.redeemablePerRTokenGlobal + delta);
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT + amount - openPosition);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - openPosition);
+        assertEq(recoveryControllerExtension.redeemablePerRTokenGlobal(), controller.redeemablePerRTokenGlobal + delta);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
+        assertEq(
+            underlyingToken.balanceOf(address(recoveryControllerExtension)),
+            controller.balanceUT - openPosition - amount
+        );
 
         // And: "underlyingToken" balance of "owner" increases with remaining funds.
         assertEq(underlyingToken.balanceOf(users.owner), 0);
@@ -1020,18 +1161,18 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Then: Transaction reverts with "NOT_ACTIVE".
         vm.prank(aggrievedUser);
         vm.expectRevert("NOT_ACTIVE");
-        recoveryController.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.withdrawRecoveryTokens(amount);
     }
 
     function testFuzz_Revert_withdrawRecoveryTokens_ZeroAmount(address aggrievedUser) public {
         // Given: "RecoveryController" is active.
-        recoveryController.setActive(true);
+        recoveryControllerExtension.setActive(true);
 
         // When: "aggrievedUser" calls "withdrawRecoveryTokens" with 0 amount.
         // Then: Transaction reverts with "WRT: ZERO_AMOUNT".
         vm.prank(aggrievedUser);
         vm.expectRevert("WRT: ZERO_AMOUNT");
-        recoveryController.withdrawRecoveryTokens(0);
+        recoveryControllerExtension.withdrawRecoveryTokens(0);
     }
 
     function testFuzz_withdrawRecoveryTokens_NonRecoveredPosition(
@@ -1040,7 +1181,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -1061,19 +1202,23 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // When: "aggrievedUser" calls "withdrawRecoveryTokens".
         vm.prank(user.addr);
-        recoveryController.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.withdrawRecoveryTokens(amount);
 
         // Then: "aggrievedUser" state variables are updated.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), user.balanceWRT - amount);
-        assertEq(recoveryController.redeemed(user.addr), user.redeemed + redeemable);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), user.redeemed + redeemable);
+        assertEq(
+            recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal
+        );
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT + amount);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + redeemable);
 
         // And: "controller" state variables are updated.
         assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - amount);
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - amount - redeemable);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - redeemable);
+        assertEq(
+            recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - amount - redeemable
+        );
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - redeemable);
     }
 
     function testFuzz_withdrawRecoveryTokens_FullyRecoveredPosition_WithWithdrawal_LastPosition(
@@ -1081,8 +1226,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(user.addr != address(recoveryController));
+        // Given: "aggrievedUser" is not the "recoveryController" or "owner".
+        vm.assume(user.addr != address(recoveryControllerExtension));
+        vm.assume(user.addr != address(users.owner));
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -1105,19 +1251,19 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // When: "aggrievedUser" calls "withdrawRecoveryTokens".
         vm.prank(user.addr);
-        recoveryController.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.withdrawRecoveryTokens(amount);
 
         // Then: "aggrievedUser" state variables are updated.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
-        assertEq(recoveryController.redeemed(user.addr), 0);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
+        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT + openPosition - redeemable);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + redeemable);
 
         // And: "controller" state variables are updated.
         assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - user.balanceWRT);
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - openPosition);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), 0);
 
         // And: "underlyingToken" balance of "owner" increases with redeemable.
         assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - redeemable);
@@ -1128,8 +1274,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         UserState memory user,
         ControllerState memory controller
     ) public {
-        // Given: "aggrievedUser" is not the "recoveryController".
-        vm.assume(user.addr != address(recoveryController));
+        // Given: "aggrievedUser" is not the "recoveryController" or "owner".
+        vm.assume(user.addr != address(recoveryControllerExtension));
+        vm.assume(user.addr != address(users.owner));
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -1153,19 +1300,19 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // When: "aggrievedUser" calls "withdrawRecoveryTokens".
         vm.prank(user.addr);
-        recoveryController.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.withdrawRecoveryTokens(amount);
 
         // Then: "aggrievedUser" state variables are updated.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
-        assertEq(recoveryController.redeemed(user.addr), 0);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
+        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT + openPosition - redeemable);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + redeemable);
 
         // And: "controller" state variables are updated.
         assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - user.balanceWRT);
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - openPosition);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - redeemable);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - redeemable);
 
         // And: "underlyingToken" balance of "owner" does not increase.
         assertEq(underlyingToken.balanceOf(users.owner), 0);
@@ -1177,7 +1324,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController" or "owner".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
         // And: The protocol is active with a random valid state.
@@ -1204,19 +1351,19 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // When: "aggrievedUser" calls "withdrawRecoveryTokens".
         vm.prank(user.addr);
-        recoveryController.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.withdrawRecoveryTokens(amount);
 
         // Then: "aggrievedUser" state variables are updated.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
-        assertEq(recoveryController.redeemed(user.addr), 0);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
+        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
 
         // And: "controller" state variables are updated.
         assertEq(wrappedRecoveryToken.totalSupply(), 0);
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - openPosition);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), 0);
 
         // And: "underlyingToken" balance of "owner" increases with remaining funds.
         assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - openPosition);
@@ -1228,7 +1375,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         ControllerState memory controller
     ) public {
         // Given: "aggrievedUser" is not the "recoveryController" or "owner".
-        vm.assume(user.addr != address(recoveryController));
+        vm.assume(user.addr != address(recoveryControllerExtension));
         vm.assume(user.addr != address(users.owner));
 
         // And: The protocol is active with a random valid state.
@@ -1262,20 +1409,20 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // When: "aggrievedUser" calls "withdrawRecoveryTokens".
         vm.prank(user.addr);
-        recoveryController.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.withdrawRecoveryTokens(amount);
 
         // Then: "aggrievedUser" state variables are updated.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
-        assertEq(recoveryController.redeemed(user.addr), 0);
-        assertEq(recoveryController.getRedeemablePerRTokenLast(user.addr), 0);
+        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
+        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
 
         // And: "controller" state variables are updated.
         assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - user.balanceWRT);
-        assertEq(recoveryController.redeemablePerRTokenGlobal(), controller.redeemablePerRTokenGlobal + delta);
-        assertEq(recoveryToken.balanceOf(address(recoveryController)), controller.balanceRT - openPosition);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), controller.balanceUT - openPosition);
+        assertEq(recoveryControllerExtension.redeemablePerRTokenGlobal(), controller.redeemablePerRTokenGlobal + delta);
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - openPosition);
 
         // And: "underlyingToken" balance of "owner" increases with remaining funds.
         assertEq(underlyingToken.balanceOf(users.owner), 0);
