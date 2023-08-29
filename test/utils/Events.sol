@@ -13,4 +13,10 @@ abstract contract Events {
     event ActivationSet(bool active);
 
     event TerminationInitiated(uint32 timestamp);
+
+    /*//////////////////////////////////////////////////////////////
+                            ERC20
+    //////////////////////////////////////////////////////////////*/
+
+    event Transfer(address indexed from, address indexed to, uint256 amount);
 }

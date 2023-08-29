@@ -26,7 +26,7 @@ abstract contract Base_Test is Test, Events, Errors, Utils {
                                    TEST CONTRACTS
     //////////////////////////////////////////////////////////////////////////*/
 
-    ERC20Mock internal underlyingToken;
+    ERC20 internal underlyingToken;
     RecoveryToken internal recoveryToken;
     RecoveryController internal recoveryController;
     ERC20 internal wrappedRecoveryToken;
