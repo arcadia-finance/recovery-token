@@ -5,7 +5,7 @@
 pragma solidity ^0.8.13;
 
 import {Script} from "../lib/forge-std/src/Script.sol";
-import {stdJson} from "../lib/forge-std/src/stdJson.sol";
+import {stdJson} from "../lib/forge-std/src/StdJson.sol";
 
 import {RecoveryController} from "../src/RecoveryController.sol";
 
