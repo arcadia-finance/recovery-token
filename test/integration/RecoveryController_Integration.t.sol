@@ -129,7 +129,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         pure
         returns (uint256 redeemable, uint256 openPosition)
     {
-        redeemable = user.balanceWRT * (controller.redeemablePerRTokenGlobal - user.redeemablePerRTokenLast) / 10e18;
+        redeemable = user.balanceWRT * (controller.redeemablePerRTokenGlobal - user.redeemablePerRTokenLast) / 1e18;
         openPosition = user.balanceWRT - user.redeemed;
     }
 
@@ -606,8 +606,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
         vm.assume(supplyWRT > 0);
 
         // And: New redeemablePerRTokenGlobal does not overflow.
-        amount = bound(amount, 0, type(uint256).max / 10e18);
-        uint256 delta = amount * 10e18 / supplyWRT;
+        amount = bound(amount, 0, type(uint256).max / 1e18);
+        uint256 delta = amount * 1e18 / supplyWRT;
         redeemablePerRTokenGlobal = bound(redeemablePerRTokenGlobal, 0, type(uint256).max - delta);
 
         // And: State is persisted.
@@ -680,12 +680,12 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Given: "aggrievedUser" is not the "recoveryController".
         vm.assume(user.addr != address(recoveryControllerExtension));
 
-        // And: "amount" is non-zero.
-        vm.assume(amount > 0);
-
         // And: "depositor" is not "aggrievedUser" or "recoveryController".
         vm.assume(depositor != address(recoveryControllerExtension));
         vm.assume(depositor != user.addr);
+
+        // And: "amount" is non-zero.
+        vm.assume(amount > 0);
 
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
@@ -698,8 +698,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
         amount = bound(amount, 1, type(uint256).max - controller.balanceUT);
 
         // And: Assume "delta" does not overflow (unrealistic big numbers).
-        amount = bound(amount, 1, type(uint256).max / 10e18);
-        uint256 delta = amount * 10e18 / controller.supplyWRT;
+        amount = bound(amount, 1, type(uint256).max / 1e18);
+        uint256 delta = amount * 1e18 / controller.supplyWRT;
         // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
         vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
         // And: "user.redeemable" does not overflow.
@@ -731,8 +731,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
         {
             // No direct function on the contract -> calculate actualTotalRedeemable of last deposit.
             uint256 actualTotalRedeemable = recoveryControllerExtension.totalSupply()
-                * (recoveryControllerExtension.redeemablePerRTokenGlobal() - controller.redeemablePerRTokenGlobal) / 10e18;
-            uint256 maxRoundingError = controller.supplyWRT / 10e18 + 1;
+                * (recoveryControllerExtension.redeemablePerRTokenGlobal() - controller.redeemablePerRTokenGlobal) / 1e18;
+            uint256 maxRoundingError = controller.supplyWRT / 1e18 + 1;
             // Lower bound of the error.
             lowerBoundTotal = maxRoundingError < amount ? amount - maxRoundingError : 0;
             // Upper bound is the amount deposited itself.
@@ -912,8 +912,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
         vm.assume(redeemable <= type(uint256).max - user.redeemed);
         uint256 surplus = user.redeemed + redeemable - user.balanceWRT;
         // And: Assume "delta" does not overflow (unrealistic big numbers).
-        vm.assume(surplus <= type(uint256).max / 10e18);
-        uint256 delta = surplus * 10e18 / (controller.supplyWRT - user.balanceWRT);
+        vm.assume(surplus <= type(uint256).max / 1e18);
+        uint256 delta = surplus * 1e18 / (controller.supplyWRT - user.balanceWRT);
         // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
         vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
 
@@ -1165,8 +1165,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
         vm.assume(redeemable <= type(uint256).max - user.redeemed);
         uint256 surplus = user.redeemed + redeemable - user.balanceWRT - amount;
         // And: Assume "delta" does not overflow (unrealistic big numbers).
-        vm.assume(surplus <= type(uint256).max / 10e18);
-        uint256 delta = surplus * 10e18 / (controller.supplyWRT - user.balanceWRT);
+        vm.assume(surplus <= type(uint256).max / 1e18);
+        uint256 delta = surplus * 1e18 / (controller.supplyWRT - user.balanceWRT);
         // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
         vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
 
@@ -1446,8 +1446,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
         vm.assume(redeemable <= type(uint256).max - user.redeemed);
         uint256 surplus = user.redeemed + redeemable - user.balanceWRT;
         // And: Assume "delta" does not overflow (unrealistic big numbers).
-        vm.assume(surplus <= type(uint256).max / 10e18);
-        uint256 delta = surplus * 10e18 / (controller.supplyWRT - user.balanceWRT);
+        vm.assume(surplus <= type(uint256).max / 1e18);
+        uint256 delta = surplus * 1e18 / (controller.supplyWRT - user.balanceWRT);
         // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
         vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
 

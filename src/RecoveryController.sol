@@ -311,7 +311,7 @@ contract RecoveryController is ERC20, Owned {
 
         // Calculate the redeemable underlying tokens since the last redemption.
         uint256 redeemable =
-            initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 10e18);
+            initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 1e18);
 
         if (openPosition <= redeemable) {
             // Updated balance of redeemed Underlying Tokens exceeds the non-redeemed rTokens.
@@ -352,7 +352,7 @@ contract RecoveryController is ERC20, Owned {
             redeemedLast = redeemed[msg.sender];
             // Calculate the redeemable underlying tokens since the last redemption.
             redeemable =
-                initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[msg.sender], 10e18);
+                initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[msg.sender], 1e18);
         }
 
         uint256 openPosition = initialBalance + amount - redeemedLast;
@@ -394,7 +394,7 @@ contract RecoveryController is ERC20, Owned {
 
         // Calculate the redeemable underlying tokens since the last redemption.
         uint256 redeemable =
-            initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[msg.sender], 10e18);
+            initialBalance.mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[msg.sender], 1e18);
 
         if (openPosition <= redeemable) {
             // Updated balance of redeemed Underlying Tokens, even before withdrawing rTokens,
@@ -437,7 +437,7 @@ contract RecoveryController is ERC20, Owned {
      */
     function maxRedeemable(address owner_) public view returns (uint256 redeemable) {
         // Calculate the redeemable underlying tokens since the last redemption.
-        redeemable = balanceOf[owner_].mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 10e18);
+        redeemable = balanceOf[owner_].mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 1e18);
 
         // Calculate the open position.
         uint256 openPosition = balanceOf[owner_] - redeemed[owner_];
@@ -452,7 +452,7 @@ contract RecoveryController is ERC20, Owned {
      */
     function previewRedeemable(address owner_) public view returns (uint256 redeemable) {
         // Calculate the redeemable underlying tokens since the last redemption.
-        redeemable = balanceOf[owner_].mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 10e18);
+        redeemable = balanceOf[owner_].mulDivDown(redeemablePerRTokenGlobal - redeemablePerRTokenLast[owner_], 1e18);
     }
 
     /**
@@ -499,7 +499,7 @@ contract RecoveryController is ERC20, Owned {
      * @param amount The amount of redeemed Underlying Tokens.
      */
     function _distributeUnderlying(uint256 amount) internal {
-        if (amount != 0) redeemablePerRTokenGlobal += amount.mulDivDown(10e18, totalSupply);
+        if (amount != 0) redeemablePerRTokenGlobal += amount.mulDivDown(1e18, totalSupply);
     }
 
     /*//////////////////////////////////////////////////////////////
