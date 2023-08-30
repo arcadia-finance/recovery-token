@@ -508,7 +508,7 @@ contract RecoveryController is ERC20, Owned {
 
     /**
      * @notice Starts the termination process.
-     * @dev The termination process is a two step process, a fixed 'COOLDOWN_PERIOD' should pass between initiation and finalisation..
+     * @dev The termination process is a two step process, a fixed 'COOLDOWN_PERIOD' should pass between initiation and finalisation.
      * @dev during the 'COOLDOWN_PERIOD' all Wrapped Recovery Token Holders should claim their redeemable balances.
      */
     function initiateTermination() external onlyOwner {
