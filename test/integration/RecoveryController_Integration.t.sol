@@ -165,7 +165,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // When "owner_" deploys "recoveryController_".
         vm.prank(owner_);
         vm.expectEmit();
-        emit ActiveSet(false);
+        emit ActivationSet(false);
         RecoveryControllerExtension recoveryController_ = new RecoveryControllerExtension(address(underlyingToken));
 
         // Then: the immutable variables are set on "recoveryController_".
@@ -178,7 +178,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
                         ACTIVATION LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function testFuzz_Revert_activate(address unprivilegedAddress) public {
+    function testFuzz_Revert_activate_NonOwner(address unprivilegedAddress) public {
         // Given: Caller is not the "owner".
         vm.assume(unprivilegedAddress != users.owner);
 
@@ -189,12 +189,24 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryControllerExtension.activate();
     }
 
+    function testFuzz_Revert_activate_Terminated(uint32 terminationTimestamp) public {
+        // Given: The termination is already initialised.
+        terminationTimestamp = uint32(bound(terminationTimestamp, 1, type(uint32).max));
+        recoveryControllerExtension.setTerminationTimestamp(terminationTimestamp);
+
+        // When: "owner" calls "activate".
+        // Then: Transaction should revert with "ControllerTerminated".
+        vm.prank(users.owner);
+        vm.expectRevert(ControllerTerminated.selector);
+        recoveryControllerExtension.activate();
+    }
+
     function test_activate() public {
         // Given:
-        // When: "unprivilegedAddress" calls "activate".
+        // When: "owner" calls "activate".
         vm.prank(users.owner);
         vm.expectEmit(address(recoveryControllerExtension));
-        emit ActiveSet(true);
+        emit ActivationSet(true);
         recoveryControllerExtension.activate();
 
         // Then "RecoveryController" is active.
@@ -1460,7 +1472,111 @@ contract RecoveryController_Integration_Test is Integration_Test {
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
         assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - openPosition);
 
-        // And: "underlyingToken" balance of "owner" increases with remaining funds.
+        // And: "underlyingToken" balance of "owner" does not increase.
         assertEq(underlyingToken.balanceOf(users.owner), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        CONTRACT TERMINATION
+    //////////////////////////////////////////////////////////////*/
+    function testFuzz_Revert_initiateTermination_NonOwner(address unprivilegedAddress) public {
+        // Given: Caller is not the "owner".
+        vm.assume(unprivilegedAddress != users.owner);
+
+        // When: "unprivilegedAddress" calls "initiateTermination".
+        // Then: Transaction should revert with "UNAUTHORIZED".
+        vm.prank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        recoveryControllerExtension.initiateTermination();
+    }
+
+    function testFuzz_initiateTermination(uint32 currentTime, ControllerState memory controller) public {
+        // Given: A certain time.
+        vm.warp(currentTime);
+
+        // And: State is persisted.
+        setControllerState(controller);
+
+        // When: "owner" calls "initiateTermination".
+        vm.prank(users.owner);
+        vm.expectEmit(address(recoveryControllerExtension));
+        emit TerminationInitiated(currentTime);
+        recoveryControllerExtension.initiateTermination();
+
+        // Then: "terminationTimestamp" is set to "currentTime".
+        assertEq(recoveryControllerExtension.terminationTimestamp(), currentTime);
+    }
+
+    function testFuzz_Revert_finaliseTermination_NonOwner(address unprivilegedAddress) public {
+        // Given: Caller is not the "owner".
+        vm.assume(unprivilegedAddress != users.owner);
+
+        // When: "unprivilegedAddress" calls "finaliseTermination".
+        // Then: Transaction should revert with "UNAUTHORIZED".
+        vm.prank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        recoveryControllerExtension.finaliseTermination();
+    }
+
+    function test_Revert_finaliseTermination_NotInitialised() public {
+        // Given: The termination is not initialised.
+        assertEq(recoveryControllerExtension.terminationTimestamp(), 0);
+
+        // When: "owner" calls "finaliseTermination".
+        // Then: Transaction should revert with "TerminationCoolDownPeriodNotPassed".
+        vm.prank(users.owner);
+        vm.expectRevert(TerminationCoolDownPeriodNotPassed.selector);
+        recoveryControllerExtension.finaliseTermination();
+    }
+
+    function testFuzz_Revert_finaliseTermination_TerminationCoolDownPeriodNotPassed(
+        uint32 terminationTimestamp,
+        uint32 currentTime
+    ) public {
+        // Given: The termination is initialised at "terminationTimestamp".
+        terminationTimestamp = uint32(bound(terminationTimestamp, 1, type(uint32).max - 1 weeks + 1));
+        recoveryControllerExtension.setTerminationTimestamp(terminationTimestamp);
+
+        // And: Less then "COOLDOWN_PERIOD" (1 week) passed.
+        currentTime = uint32(bound(currentTime, terminationTimestamp, terminationTimestamp + 1 weeks - 1));
+        vm.warp(currentTime);
+
+        // When: "owner" calls "finaliseTermination".
+        // Then: Transaction should revert with "TerminationCoolDownPeriodNotPassed".
+        vm.prank(users.owner);
+        vm.expectRevert(TerminationCoolDownPeriodNotPassed.selector);
+        recoveryControllerExtension.finaliseTermination();
+    }
+
+    function testFuzz_finaliseTermination(
+        uint32 terminationTimestamp,
+        uint32 currentTime,
+        ControllerState memory controller
+    ) public {
+        // Given: The termination is initialised at "terminationTimestamp".
+        terminationTimestamp = uint32(bound(terminationTimestamp, 1, type(uint32).max - 1 weeks));
+        recoveryControllerExtension.setTerminationTimestamp(terminationTimestamp);
+
+        // And: More then "COOLDOWN_PERIOD" (1 week) passed.
+        currentTime = uint32(bound(currentTime, terminationTimestamp + 1 weeks, type(uint32).max));
+        vm.warp(currentTime);
+
+        // And: State is persisted.
+        setControllerState(controller);
+
+        // When: "owner" calls "finaliseTermination".
+        vm.prank(users.owner);
+        vm.expectEmit(address(recoveryControllerExtension));
+        emit ActivationSet(false);
+        recoveryControllerExtension.finaliseTermination();
+
+        // Then: "recoveryController" is not active.
+        assertFalse(recoveryControllerExtension.active());
+
+        // Then: "underlyingToken" balance of "recoveryController" becomes zero.
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), 0);
+
+        // And: "underlyingToken" balance of "owner" increases with remaining funds.
+        assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT);
     }
 }
