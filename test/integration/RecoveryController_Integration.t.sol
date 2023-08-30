@@ -164,6 +164,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
 
         // When "owner_" deploys "recoveryController_".
         vm.prank(owner_);
+        vm.expectEmit();
+        emit ActiveSet(false);
         RecoveryControllerExtension recoveryController_ = new RecoveryControllerExtension(address(underlyingToken));
 
         // Then: the immutable variables are set on "recoveryController_".
@@ -191,6 +193,8 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Given:
         // When: "unprivilegedAddress" calls "activate".
         vm.prank(users.owner);
+        vm.expectEmit(address(recoveryControllerExtension));
+        emit ActiveSet(true);
         recoveryControllerExtension.activate();
 
         // Then "RecoveryController" is active.
@@ -208,9 +212,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         deal(address(recoveryControllerExtension), aggrievedUser, initialBalance);
 
         // When: "aggrievedUser" transfers "amount" to "to".
-        // Then: Transaction should revert with "NotAllowed".
+        // Then: Transaction should revert with "NoTransfersAllowed".
         vm.prank(aggrievedUser);
-        vm.expectRevert(NotAllowed.selector);
+        vm.expectRevert(NoTransfersAllowed.selector);
         recoveryControllerExtension.transfer(to, amount);
     }
 
@@ -229,9 +233,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryControllerExtension.approve(caller, allowance);
 
         // When: "caller" transfers "amount" from "aggrievedUser" to "to".
-        // Then: Transaction should revert with "NotAllowed".
+        // Then: Transaction should revert with "NoTransfersAllowed".
         vm.prank(caller);
-        vm.expectRevert(NotAllowed.selector);
+        vm.expectRevert(NoTransfersAllowed.selector);
         recoveryControllerExtension.transferFrom(aggrievedUser, to, amount);
     }
 
@@ -256,9 +260,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryControllerExtension.activate();
 
         // When: "owner" mints "amount" to "to".
-        // Then: Transaction should revert with "UNAUTHORIZED".
+        // Then: Transaction should revert with "Active".
         vm.prank(users.owner);
-        vm.expectRevert("ACTIVE");
+        vm.expectRevert(Active.selector);
         recoveryControllerExtension.mint(to, amount);
     }
 
@@ -314,10 +318,26 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryControllerExtension.activate();
 
         // When: "owner" mints "amount" to "to".
-        // Then: Transaction should revert with "UNAUTHORIZED".
+        // Then: Transaction should revert with "Active".
         vm.prank(users.owner);
-        vm.expectRevert("ACTIVE");
+        vm.expectRevert(Active.selector);
         recoveryControllerExtension.batchMint(tos_, amounts_);
+    }
+
+    function testFuzz_Revert_batchMint_LengthMismatch(address[2] calldata tos, uint256[] calldata amounts) public {
+        // Cast between fixed size arrays and dynamic size array.
+        address[] memory tos_ = castArrayFixedToDynamic(tos);
+
+        // Given: "RecoveryController" is not active.
+
+        // And: Length of both input arrays is not equal (test-condition LengthMismatch).
+        vm.assume(tos.length != amounts.length);
+
+        // When: "owner" mints "amounts" to "tos".
+        // Then: Transaction should revert with "LengthMismatch".
+        vm.prank(users.owner);
+        vm.expectRevert(LengthMismatch.selector);
+        recoveryControllerExtension.batchMint(tos_, amounts);
     }
 
     function testFuzz_batchMint(
@@ -368,6 +388,22 @@ contract RecoveryController_Integration_Test is Integration_Test {
         vm.prank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
         recoveryControllerExtension.burn(from, amount);
+    }
+
+    function testFuzz_Revert_batchBurn_LengthMismatch(address[2] calldata froms, uint256[] calldata amounts) public {
+        // Cast between fixed size arrays and dynamic size array.
+        address[] memory froms_ = castArrayFixedToDynamic(froms);
+
+        // Given: "RecoveryController" is not active.
+
+        // And: Length of both input arrays is not equal (test-condition LengthMismatch).
+        vm.assume(froms.length != amounts.length);
+
+        // When: "owner" burns "amounts" from "froms".
+        // Then: Transaction should revert with "LengthMismatch".
+        vm.prank(users.owner);
+        vm.expectRevert(LengthMismatch.selector);
+        recoveryControllerExtension.batchBurn(froms_, amounts);
     }
 
     function testFuzz_burn_PositionPartiallyClosed(UserState memory user, uint256 amount, uint256 controllerBalanceRT)
@@ -580,9 +616,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Given: "RecoveryController" is not active.
 
         // When: A "depositor" deposits "amount" of "underlyingToken".
-        // Then: Transaction should revert with "NOT_ACTIVE".
+        // Then: Transaction should revert with "NotActive".
         vm.prank(depositor);
-        vm.expectRevert("NOT_ACTIVE");
+        vm.expectRevert(NotActive.selector);
         recoveryControllerExtension.depositUnderlying(amount);
     }
 
@@ -591,9 +627,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryControllerExtension.setActive(true);
 
         // When: A "depositor" deposits "amount" of "underlyingToken".
-        // Then: Transaction should revert with "NOT_ACTIVE".
+        // Then: Transaction should revert with "DepositAmountZero".
         vm.prank(depositor);
-        vm.expectRevert("DU: ZERO_AMOUNT");
+        vm.expectRevert(DepositAmountZero.selector);
         recoveryControllerExtension.depositUnderlying(0);
     }
 
@@ -707,9 +743,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Given: "RecoveryController" is not active.
 
         // When: "caller" calls "redeemUnderlying".
-        // Then: Transaction should revert with "NOT_ACTIVE".
+        // Then: Transaction should revert with "NotActive".
         vm.prank(caller);
-        vm.expectRevert("NOT_ACTIVE");
+        vm.expectRevert(NotActive.selector);
         recoveryControllerExtension.redeemUnderlying(aggrievedUser);
     }
 
@@ -896,9 +932,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Given: "RecoveryController" is not active.
 
         // When: "aggrievedUser" calls "depositRecoveryTokens" with "amount".
-        // Then: Transaction reverts with "NOT_ACTIVE".
+        // Then: Transaction reverts with "NotActive".
         vm.prank(aggrievedUser);
-        vm.expectRevert("NOT_ACTIVE");
+        vm.expectRevert(NotActive.selector);
         recoveryControllerExtension.depositRecoveryTokens(amount);
     }
 
@@ -907,9 +943,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryControllerExtension.setActive(true);
 
         // When: "aggrievedUser" calls "depositRecoveryTokens" with 0 amount.
-        // Then: Transaction reverts with "DRT: ZERO_AMOUNT".
+        // Then: Transaction reverts with "DRT: DepositAmountZero".
         vm.prank(aggrievedUser);
-        vm.expectRevert("DRT: ZERO_AMOUNT");
+        vm.expectRevert(DepositAmountZero.selector);
         recoveryControllerExtension.depositRecoveryTokens(0);
     }
 
@@ -1158,9 +1194,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         // Given: "RecoveryController" is not active.
 
         // When: "aggrievedUser" calls "withdrawRecoveryTokens" with "amount".
-        // Then: Transaction reverts with "NOT_ACTIVE".
+        // Then: Transaction reverts with "NotActive".
         vm.prank(aggrievedUser);
-        vm.expectRevert("NOT_ACTIVE");
+        vm.expectRevert(NotActive.selector);
         recoveryControllerExtension.withdrawRecoveryTokens(amount);
     }
 
@@ -1169,9 +1205,9 @@ contract RecoveryController_Integration_Test is Integration_Test {
         recoveryControllerExtension.setActive(true);
 
         // When: "aggrievedUser" calls "withdrawRecoveryTokens" with 0 amount.
-        // Then: Transaction reverts with "WRT: ZERO_AMOUNT".
+        // Then: Transaction reverts with "WRT: WithdrawAmountZero".
         vm.prank(aggrievedUser);
-        vm.expectRevert("WRT: ZERO_AMOUNT");
+        vm.expectRevert(WithdrawAmountZero.selector);
         recoveryControllerExtension.withdrawRecoveryTokens(0);
     }
 
