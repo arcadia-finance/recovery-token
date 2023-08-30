@@ -35,7 +35,7 @@ contract DeployRecoveryContracts is Script {
     ///////////////////////////////////////////////////////////////*/
 
     constructor() {
-        broadcasterPrivateKey = vm.envUint("PRIVATE_KEY_DEPLOYER_MAINNET");
+        broadcasterPrivateKey = vm.envUint("PRIVATE_KEY_DEPLOYER_OPTIMISM");
     }
 
     /*///////////////////////////////////////////////////////////////
