@@ -1,8 +1,8 @@
 /**
  * Created by Pragma Labs
- * SPDX-License-Identifier: BUSL-1.1
+ * SPDX-License-Identifier: MIT
  */
-pragma solidity ^0.8.13;
+pragma solidity 0.8.19;
 
 import {Invariant_Test} from "./Invariant.t.sol";
 import {InactiveRecoveryControllerHandler} from "./handlers/InactiveRecoveryControllerHandler.sol";
