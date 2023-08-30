@@ -1,8 +1,8 @@
 /**
  * Created by Pragma Labs
- * SPDX-License-Identifier: BUSL-1.1
+ * SPDX-License-Identifier: MIT
  */
-pragma solidity ^0.8.13;
+pragma solidity 0.8.19;
 
 import {ERC20} from "../lib/solmate/src/tokens/ERC20.sol";
 import {Owned} from "../lib/solmate/src/auth/Owned.sol";
@@ -508,7 +508,7 @@ contract RecoveryController is ERC20, Owned {
 
     /**
      * @notice Starts the termination process.
-     * @dev The termination process is a two step process, a fixed 'COOLDOWN_PERIOD' should pass between initiation and finalisation..
+     * @dev The termination process is a two step process, a fixed 'COOLDOWN_PERIOD' should pass between initiation and finalisation.
      * @dev during the 'COOLDOWN_PERIOD' all Wrapped Recovery Token Holders should claim their redeemable balances.
      */
     function initiateTermination() external onlyOwner {

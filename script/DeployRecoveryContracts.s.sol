@@ -1,8 +1,8 @@
 /**
  * Created by Pragma Labs
- * SPDX-License-Identifier: BUSL-1.1
+ * SPDX-License-Identifier: MIT
  */
-pragma solidity ^0.8.13;
+pragma solidity 0.8.19;
 
 import {Script} from "../lib/forge-std/src/Script.sol";
 import {stdJson} from "../lib/forge-std/src/StdJson.sol";
@@ -35,7 +35,7 @@ contract DeployRecoveryContracts is Script {
     ///////////////////////////////////////////////////////////////*/
 
     constructor() {
-        broadcasterPrivateKey = vm.envUint("PRIVATE_KEY_DEPLOYER_MAINNET");
+        broadcasterPrivateKey = vm.envUint("PRIVATE_KEY_DEPLOYER_OPTIMISM");
     }
 
     /*///////////////////////////////////////////////////////////////
