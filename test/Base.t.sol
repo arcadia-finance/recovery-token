@@ -80,8 +80,4 @@ abstract contract Base_Test is Test, Events, Errors, Utils {
         vm.label({account: address(recoveryToken), newLabel: "RecoveryToken"});
         vm.label({account: address(recoveryController), newLabel: "RecoveryController"});
     }
-
-    /*//////////////////////////////////////////////////////////////////////////
-                                    CALL EXPECTS
-    //////////////////////////////////////////////////////////////////////////*/
 }
