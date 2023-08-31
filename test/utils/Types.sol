@@ -5,9 +5,9 @@
 pragma solidity 0.8.19;
 
 struct Users {
+    address payable tokenCreator;
     address payable creator;
     address payable owner;
-    address payable tokenCreator;
     address payable aggrievedUser0;
     address payable aggrievedUser1;
     address payable alice;
