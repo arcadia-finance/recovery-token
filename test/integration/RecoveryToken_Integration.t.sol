@@ -40,7 +40,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
                             DEPLOYMENT
     /////////////////////////////////////////////////////////////// */
 
-    function testFuzz_deployment(address owner_, address recoveryController_, uint8 decimals_) public {
+    function testFuzz_Pass_deployment(address owner_, address recoveryController_, uint8 decimals_) public {
         recoveryTokenExtension = new RecoveryTokenExtension(owner_, recoveryController_, decimals_);
 
         assertEq(recoveryTokenExtension.owner(), owner_);
@@ -52,7 +52,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
                             MINT/BURN LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function testRevert_Fuzz_mint_NonRecoveryController(address unprivilegedAddress, uint256 amount) public {
+    function testFuzz_Revert_mint_NonRecoveryController(address unprivilegedAddress, uint256 amount) public {
         // Given: Caller is not the "recoveryController".
         vm.assume(unprivilegedAddress != address(recoveryController));
 
@@ -63,7 +63,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         recoveryTokenExtension.mint(amount);
     }
 
-    function testFuzz_mint(uint256 initialBalance, uint256 amount) public {
+    function testFuzz_Pass_mint(uint256 initialBalance, uint256 amount) public {
         // Given "recoveryController" has "initialBalance" tokens.
         deal(address(recoveryTokenExtension), address(recoveryController), initialBalance);
         // And: Balance does not overflow after mint.
@@ -94,7 +94,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         recoveryTokenExtension.burn(amount);
     }
 
-    function testFuzz_burn_1arg(address aggrievedUser, uint256 initialBalance, uint256 amount) public {
+    function testFuzz_Pass_burn_1arg(address aggrievedUser, uint256 initialBalance, uint256 amount) public {
         // Given "aggrievedUser" has "initialBalance" tokens.
         deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
         // And: "amount" is smaller or equal as "initialBalance".
@@ -143,7 +143,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
         recoveryTokenExtension.burn(aggrievedUser, amount);
     }
 
-    function testFuzz_burn_2arg(address aggrievedUser, uint256 initialBalance, uint256 amount) public {
+    function testFuzz_Pass_burn_2arg(address aggrievedUser, uint256 initialBalance, uint256 amount) public {
         // Given "aggrievedUser" has "initialBalance" tokens.
         deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
         // And: "amount" is smaller or equal as "initialBalance".

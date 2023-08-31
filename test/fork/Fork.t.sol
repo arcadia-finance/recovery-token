@@ -47,7 +47,7 @@ contract Fork_Test is Base_Test {
         deployRecoveryContracts();
     }
 
-    function testFork_deposit(TestVars memory vars) public {
+    function testFork_Pass_deposit(TestVars memory vars) public {
         // Given: Users are unique.
         givenUniqueUsers(vars);
 
@@ -82,7 +82,7 @@ contract Fork_Test is Base_Test {
         assertEq(underlyingToken.balanceOf(address(recoveryController)), vars.depositAmountUT);
     }
 
-    function testFork_redeem_NonRecoveredPosition(TestVars memory vars) public {
+    function testFork_Pass_redeem_NonRecoveredPosition(TestVars memory vars) public {
         // Given: users are unique.
         givenUniqueUsers(vars);
 
@@ -110,7 +110,7 @@ contract Fork_Test is Base_Test {
         assertApproxEqAbs(underlyingToken.balanceOf(address(recoveryController)), 0, maxRoundingError);
     }
 
-    function testFork_redeem_FullyRecoveredPosition(TestVars memory vars) public {
+    function testFork_Pass_redeem_FullyRecoveredPosition(TestVars memory vars) public {
         // Given: users are unique.
         givenUniqueUsers(vars);
 
