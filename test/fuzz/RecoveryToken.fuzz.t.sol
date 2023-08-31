@@ -6,10 +6,10 @@ pragma solidity 0.8.19;
 
 import {StdStorage, stdStorage} from "../../lib/forge-std/src/Test.sol";
 import {stdError} from "../../lib/forge-std/src/StdError.sol";
-import {Integration_Test} from "./Integration.t.sol";
+import {Fuzz_Test} from "./Fuzz.t.sol";
 import {RecoveryTokenExtension} from "../utils/Extensions.sol";
 
-contract RecoveryToken_Integration_Test is Integration_Test {
+contract RecoveryToken_Fuzz_Test is Fuzz_Test {
     using stdStorage for StdStorage;
     /* ///////////////////////////////////////////////////////////////
                              VARIABLES
@@ -26,7 +26,7 @@ contract RecoveryToken_Integration_Test is Integration_Test {
     /////////////////////////////////////////////////////////////// */
 
     function setUp() public virtual override {
-        Integration_Test.setUp();
+        Fuzz_Test.setUp();
 
         // Deploy Recovery Token contract.
         recoveryTokenExtension =

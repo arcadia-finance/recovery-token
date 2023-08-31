@@ -8,12 +8,12 @@ import {StdStorage, stdStorage} from "../../lib/forge-std/src/Test.sol";
 import {stdError} from "../../lib/forge-std/src/StdError.sol";
 import {FixedPointMathLib} from "../../lib/solmate/src/utils/FixedPointMathLib.sol";
 import {UserState, ControllerState} from "../utils/Types.sol";
-import {Integration_Test} from "./Integration.t.sol";
+import {Fuzz_Test} from "./Fuzz.t.sol";
 import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 import {RecoveryToken} from "../../src/RecoveryToken.sol";
 import {RecoveryControllerExtension} from "../utils/Extensions.sol";
 
-contract RecoveryController_Integration_Test is Integration_Test {
+contract RecoveryController_Fuzz_Test is Fuzz_Test {
     using stdStorage for StdStorage;
     using FixedPointMathLib for uint256;
     /* ///////////////////////////////////////////////////////////////
@@ -31,7 +31,7 @@ contract RecoveryController_Integration_Test is Integration_Test {
     /////////////////////////////////////////////////////////////// */
 
     function setUp() public virtual override {
-        Integration_Test.setUp();
+        Fuzz_Test.setUp();
 
         // Deploy Recovery contracts.
         vm.prank(users.creator);
