@@ -5,14 +5,21 @@
 pragma solidity 0.8.19;
 
 import {BaseHandler, SharedHandlerState} from "./BaseHandler.sol";
-import {RecoveryToken} from "../../../src/RecoveryToken.sol";
-import "../../utils/Constants.sol";
 
-/// @dev This contract and not { Factory } is exposed to Foundry for invariant testing. The point is
-/// to bound and restrict the inputs that get passed to the real-world contract to avoid getting reverts.
+import {RecoveryToken} from "../../../src/RecoveryToken.sol";
+
+/**
+ * @notice Handler for "RecoveryToken".
+ * @dev This contract and not "RecoveryToken" is exposed to Foundry for invariant testing. The point is
+ * to bound and restrict the inputs that get passed to the real-world contract to avoid getting reverts.
+ */
 contract RecoveryTokenHandler is BaseHandler {
     /*//////////////////////////////////////////////////////////////////////////
                                      VARIABLES
+    //////////////////////////////////////////////////////////////////////////*/
+
+    /*//////////////////////////////////////////////////////////////////////////
+                                GHOST VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
 
     /*//////////////////////////////////////////////////////////////////////////

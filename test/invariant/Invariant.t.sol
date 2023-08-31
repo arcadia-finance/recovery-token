@@ -4,11 +4,15 @@
  */
 pragma solidity 0.8.19;
 
-import {StdInvariant} from "../../lib/forge-std/src/StdInvariant.sol";
 import {Base_Test} from "../Base.t.sol";
+
+import {StdInvariant} from "../../lib/forge-std/src/StdInvariant.sol";
+
 import {SharedHandlerState} from "./SharedHandlerState.sol";
 
-/// @notice Common logic needed by all invariant tests.
+/**
+ * @notice Common logic needed by all invariant tests.
+ */
 abstract contract Invariant_Test is Base_Test {
     /*//////////////////////////////////////////////////////////////////////////
                                    TEST CONTRACTS

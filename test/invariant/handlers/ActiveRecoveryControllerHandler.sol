@@ -5,12 +5,17 @@
 pragma solidity 0.8.19;
 
 import {RecoveryControllerHandler, SharedHandlerState} from "./RecoveryControllerHandler.sol";
-import {ERC20} from "../../../lib/solmate/src/tokens/ERC20.sol";
-import {RecoveryToken} from "../../../src/RecoveryToken.sol";
-import {RecoveryController} from "../../../src/RecoveryController.sol";
 
-/// @dev This contract and not { Factory } is exposed to Foundry for invariant testing. The point is
-/// to bound and restrict the inputs that get passed to the real-world contract to avoid getting reverts.
+import {ERC20} from "../../../lib/solmate/src/tokens/ERC20.sol";
+
+import {RecoveryController} from "../../../src/RecoveryController.sol";
+import {RecoveryToken} from "../../../src/RecoveryToken.sol";
+
+/**
+ * @notice Handler for "RecoveryController" when it is not activated.
+ * @dev This contract and not "RecoveryController" is exposed to Foundry for invariant testing. The point is
+ * to bound and restrict the inputs that get passed to the real-world contract to avoid getting reverts.
+ */
 contract ActiveRecoveryControllerHandler is RecoveryControllerHandler {
     /*//////////////////////////////////////////////////////////////////////////
                                      VARIABLES

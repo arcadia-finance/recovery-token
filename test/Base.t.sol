@@ -5,17 +5,20 @@
 pragma solidity 0.8.19;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
+
 import {Constants} from "./utils/Constants.sol";
+import {ERC20, ERC20Mock} from "./mocks/ERC20Mock.sol";
 import {Errors} from "./utils/Errors.sol";
 import {Events} from "./utils/Events.sol";
-import {ERC20, ERC20Mock} from "./mocks/ERC20Mock.sol";
-import {RecoveryToken} from "../src/RecoveryToken.sol";
 import {RecoveryController} from "../src/RecoveryController.sol";
+import {RecoveryToken} from "../src/RecoveryToken.sol";
 import {Users} from "./utils/Types.sol";
 import {Utils} from "./utils/Utils.sol";
 
-/// @notice Base test contract with common logic needed by all tests.
-abstract contract Base_Test is Test, Events, Errors, Utils {
+/**
+ * @notice Base test contract with common logic needed by all tests.
+ */
+abstract contract Base_Test is Test, Errors, Events, Utils {
     /*//////////////////////////////////////////////////////////////////////////
                                      VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
