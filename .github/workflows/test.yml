@@ -6,6 +6,7 @@ on:
 
 env:
   FOUNDRY_PROFILE: ci
+  RPC_URL: ${{ secrets.RPC_URL_OPTIMISM_ALCHEMY }}
 
 jobs:
   check:
@@ -23,6 +24,9 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1.0.10
         with:
           version: nightly
+
+      - name: Run format
+        run: forge fmt --check
 
       - name: Run Forge build
         run: |
