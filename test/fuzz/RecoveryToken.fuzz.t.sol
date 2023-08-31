@@ -82,11 +82,9 @@ contract RecoveryToken_Fuzz_Test is Fuzz_Test {
         assertEq(recoveryTokenExtension.balanceOf(address(recoveryController)), initialBalance + amount);
     }
 
-    function testFuzz_Revert_burn_1arg_InsufficientBalance(
-        address user,
-        uint256 initialBalance,
-        uint256 amount
-    ) public {
+    function testFuzz_Revert_burn_1arg_InsufficientBalance(address user, uint256 initialBalance, uint256 amount)
+        public
+    {
         // Given "user" has "initialBalance" tokens.
         deal(address(recoveryTokenExtension), user, initialBalance);
         // And: "amount" is bigger as "initialBalance".
@@ -131,11 +129,9 @@ contract RecoveryToken_Fuzz_Test is Fuzz_Test {
         recoveryTokenExtension.burn(user, amount);
     }
 
-    function testFuzz_Revert_burn_2arg_InsufficientBalance(
-        address user,
-        uint256 initialBalance,
-        uint256 amount
-    ) public {
+    function testFuzz_Revert_burn_2arg_InsufficientBalance(address user, uint256 initialBalance, uint256 amount)
+        public
+    {
         // Given "user" has "initialBalance" tokens.
         deal(address(recoveryTokenExtension), user, initialBalance);
         // And: "amount" is bigger as "initialBalance".
