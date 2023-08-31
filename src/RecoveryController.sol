@@ -12,10 +12,10 @@ import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import {RecoveryToken} from "./RecoveryToken.sol";
 
 /**
- * @title Recovery Tokens.
+ * @title Recovery Controller.
  * @author Pragma Labs
  * @notice Handles the accounting and redemption of Recovery Tokens for Underlying Tokens,
- * both if assets are redeemed via legal means, or if the lost assets are redeemed via other means..
+ * both if assets are redeemed via legal means, or if the lost assets are redeemed via other means.
  * In the second situation the underlying assets will be distributed pro-rata to all holders of
  * Wrapped Recovery Tokens in discrete batches.
  * @dev Recovery Tokens can be redeemed one-to-one for Underlying Tokens.

@@ -83,82 +83,82 @@ contract RecoveryToken_Fuzz_Test is Fuzz_Test {
     }
 
     function testFuzz_Revert_burn_1arg_InsufficientBalance(
-        address aggrievedUser,
+        address user,
         uint256 initialBalance,
         uint256 amount
     ) public {
-        // Given "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
+        // Given "user" has "initialBalance" tokens.
+        deal(address(recoveryTokenExtension), user, initialBalance);
         // And: "amount" is bigger as "initialBalance".
         vm.assume(amount > initialBalance);
 
-        // When: "aggrievedUser" burns "amount".
+        // When: "user" burns "amount".
         // Then: Transaction should revert with "arithmeticError".
-        vm.prank(aggrievedUser);
+        vm.prank(user);
         vm.expectRevert(stdError.arithmeticError);
         recoveryTokenExtension.burn(amount);
     }
 
-    function testFuzz_Pass_burn_1arg(address aggrievedUser, uint256 initialBalance, uint256 amount) public {
-        // Given "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
+    function testFuzz_Pass_burn_1arg(address user, uint256 initialBalance, uint256 amount) public {
+        // Given "user" has "initialBalance" tokens.
+        deal(address(recoveryTokenExtension), user, initialBalance);
         // And: "amount" is smaller or equal as "initialBalance".
         vm.assume(amount <= initialBalance);
 
-        // When: "aggrievedUser" burns "amount".
-        vm.prank(aggrievedUser);
+        // When: "user" burns "amount".
+        vm.prank(user);
         recoveryTokenExtension.burn(amount);
 
-        // Then: Balance of "aggrievedUser" should decrease with "amount".
-        assertEq(recoveryTokenExtension.balanceOf(aggrievedUser), initialBalance - amount);
+        // Then: Balance of "user" should decrease with "amount".
+        assertEq(recoveryTokenExtension.balanceOf(user), initialBalance - amount);
     }
 
     function testFuzz_Revert_burn_2arg_NonRecoveryController(
         address unprivilegedAddress,
-        address aggrievedUser,
+        address user,
         uint256 initialBalance,
         uint256 amount
     ) public {
         // Given: Caller is not the "recoveryController".
         vm.assume(unprivilegedAddress != address(recoveryController));
-        // And: "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
+        // And: "user" has "initialBalance" tokens.
+        deal(address(recoveryTokenExtension), user, initialBalance);
 
-        // When: "unprivilegedAddress" burns "amount" of "aggrievedUser".
+        // When: "unprivilegedAddress" burns "amount" of "user".
         // Then: Transaction should revert with "NotRecoveryController".
         vm.prank(unprivilegedAddress);
         vm.expectRevert(NotRecoveryController.selector);
-        recoveryTokenExtension.burn(aggrievedUser, amount);
+        recoveryTokenExtension.burn(user, amount);
     }
 
     function testFuzz_Revert_burn_2arg_InsufficientBalance(
-        address aggrievedUser,
+        address user,
         uint256 initialBalance,
         uint256 amount
     ) public {
-        // Given "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
+        // Given "user" has "initialBalance" tokens.
+        deal(address(recoveryTokenExtension), user, initialBalance);
         // And: "amount" is bigger as "initialBalance".
         vm.assume(amount > initialBalance);
 
-        // When: "recoveryController" burns "amount" of "aggrievedUser".
+        // When: "recoveryController" burns "amount" of "user".
         // Then: Transaction should revert with "arithmeticError".
         vm.prank(address(recoveryController));
         vm.expectRevert(stdError.arithmeticError);
-        recoveryTokenExtension.burn(aggrievedUser, amount);
+        recoveryTokenExtension.burn(user, amount);
     }
 
-    function testFuzz_Pass_burn_2arg(address aggrievedUser, uint256 initialBalance, uint256 amount) public {
-        // Given "aggrievedUser" has "initialBalance" tokens.
-        deal(address(recoveryTokenExtension), aggrievedUser, initialBalance);
+    function testFuzz_Pass_burn_2arg(address user, uint256 initialBalance, uint256 amount) public {
+        // Given "user" has "initialBalance" tokens.
+        deal(address(recoveryTokenExtension), user, initialBalance);
         // And: "amount" is smaller or equal as "initialBalance".
         vm.assume(amount <= initialBalance);
 
-        // When: "recoveryController" burns "amount" of "aggrievedUser".
+        // When: "recoveryController" burns "amount" of "user".
         vm.prank(address(recoveryController));
-        recoveryTokenExtension.burn(aggrievedUser, amount);
+        recoveryTokenExtension.burn(user, amount);
 
-        // Then: Balance of "aggrievedUser" should decrease with "amount".
-        assertEq(recoveryTokenExtension.balanceOf(aggrievedUser), initialBalance - amount);
+        // Then: Balance of "user" should decrease with "amount".
+        assertEq(recoveryTokenExtension.balanceOf(user), initialBalance - amount);
     }
 }

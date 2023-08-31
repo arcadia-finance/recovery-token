@@ -46,8 +46,8 @@ contract Inactive_Invariant_Test is Invariant_Test {
         excludeSender(address(recoveryControllerHandler));
 
         // Add actors who should receive Recovery Tokens.
-        state.addActor(users.aggrievedUser0);
-        state.addActor(users.aggrievedUser1);
+        state.addActor(users.holderWRT0);
+        state.addActor(users.holderWRT1);
     }
 
     /*//////////////////////////////////////////////////////////////////////////

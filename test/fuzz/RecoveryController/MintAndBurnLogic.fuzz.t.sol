@@ -235,7 +235,7 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
         vm.prank(users.owner);
         recoveryControllerExtension.burn(user.addr, amount);
 
-        // Then: "aggrievedUser" state variables are updated.
+        // Then: "user" state variables are updated.
         assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
         assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
         assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);

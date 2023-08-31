@@ -43,8 +43,8 @@ abstract contract Base_Test is Test, Errors, Events, Utils {
             creator: createUser("creator"),
             owner: users.creator,
             tokenCreator: createUser("tokenCreator"),
-            aggrievedUser0: createUser("aggrievedUser0"),
-            aggrievedUser1: createUser("aggrievedUser1"),
+            holderWRT0: createUser("holderWRT0"),
+            holderWRT1: createUser("holderWRT1"),
             alice: createUser("alice"),
             bob: createUser("bob")
         });

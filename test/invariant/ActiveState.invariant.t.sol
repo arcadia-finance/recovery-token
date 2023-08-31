@@ -54,10 +54,10 @@ contract ActiveState_Invariant_Test is Invariant_Test {
         state.addActor(users.alice);
         state.addActor(users.bob);
 
-        // Mint the initial positions to "aggrievedUser".
+        // Mint the initial positions to users.
         vm.startPrank(users.creator);
-        mintWrappedRecoveryTokens(users.aggrievedUser0, 1e10);
-        mintWrappedRecoveryTokens(users.aggrievedUser1, 1e10);
+        mintWrappedRecoveryTokens(users.holderWRT0, 1e10);
+        mintWrappedRecoveryTokens(users.holderWRT1, 1e10);
 
         // Set Recovery Contracts on active.
         recoveryController.activate();
