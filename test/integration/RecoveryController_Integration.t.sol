@@ -727,25 +727,20 @@ contract RecoveryController_Integration_Test is Integration_Test {
         assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT + amount);
 
         // And: The total amount deposited (minus rounding error) is claimable by all rToken Holders.
-        uint256 lowerBoundTotal;
-        {
-            // No direct function on the contract -> calculate actualTotalRedeemable of last deposit.
-            uint256 actualTotalRedeemable = recoveryControllerExtension.totalSupply()
-                * (recoveryControllerExtension.redeemablePerRTokenGlobal() - controller.redeemablePerRTokenGlobal) / 1e18;
-            uint256 maxRoundingError = controller.supplyWRT / 1e18 + 1;
-            // Lower bound of the error.
-            lowerBoundTotal = maxRoundingError < amount ? amount - maxRoundingError : 0;
-            // Upper bound is the amount deposited itself.
-            uint256 upperBoundTotal = amount;
-            assertLe(lowerBoundTotal, actualTotalRedeemable);
-            assertLe(actualTotalRedeemable, upperBoundTotal);
-        }
+        // No direct function on the contract -> calculate actualTotalRedeemable of last deposit.
+        uint256 actualTotalRedeemable = recoveryControllerExtension.totalSupply()
+            * (recoveryControllerExtension.redeemablePerRTokenGlobal() - controller.redeemablePerRTokenGlobal) / 1e18;
+        uint256 maxRoundingError = controller.supplyWRT / 1e18 + 1;
+        assertApproxEqAbs(actualTotalRedeemable, amount, maxRoundingError);
 
         // And: A proportional share of "amount" is redeemable by "aggrievedUser".
         uint256 actualUserRedeemable = recoveryControllerExtension.previewRedeemable(user.addr) - userRedeemableLast;
         // ToDo: use Full Math library proper MulDiv.
         if (user.balanceWRT != 0) vm.assume(amount <= type(uint256).max / user.balanceWRT);
+        // For the lower bound we start from the lowerBound of the total deposited amount and calculate the relative share rounded down.
+        uint256 lowerBoundTotal = maxRoundingError < amount ? amount - maxRoundingError : 0;
         uint256 lowerBoundUser = lowerBoundTotal.mulDivDown(user.balanceWRT, controller.supplyWRT);
+        // For the upper bound we start from the full amount of the total deposited amount and calculate the relative share rounded up.
         uint256 upperBoundUser = amount.mulDivUp(user.balanceWRT, controller.supplyWRT);
         assertLe(lowerBoundUser, actualUserRedeemable);
         assertLe(actualUserRedeemable, upperBoundUser);

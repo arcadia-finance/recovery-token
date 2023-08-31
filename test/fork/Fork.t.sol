@@ -1,8 +1,8 @@
 /**
  * Created by Pragma Labs
- * SPDX-License-Identifier: BUSL-1.1
+ * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.13;
+pragma solidity 0.8.19;
 
 import {Base_Test} from "../Base.t.sol";
 import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
@@ -27,18 +27,15 @@ contract Fork_Test is Base_Test {
 
     struct TestVars {
         address primaryHolder;
-        address secondaryHolder;
         address depositor;
         uint256 balanceWRT;
         uint256 depositAmountUT;
-        uint256 redeemAmount;
-        uint256 withdrawAmountRT;
-        uint256 depositAmountRT;
     }
 
     function setUp() public override {
         // Fork Optimism via Tenderly.
         fork = vm.createFork(RPC_URL);
+        vm.selectFork(fork);
 
         // Set Underlying Token.
         underlyingToken = ERC20(USDC_ADDRESS);
@@ -51,6 +48,9 @@ contract Fork_Test is Base_Test {
     function testFork_deposit(TestVars memory vars) public {
         // Given: Users are unique.
         givenUniqueUsers(vars);
+
+        // Cache initial balances.
+        uint256 initialBalanceDepositor = underlyingToken.balanceOf(vars.depositor);
 
         // And: "primaryHolder" has a valid "wrappedRecoveryToken" balance.
         vars = givenValidBalanceWRT(vars);
@@ -71,13 +71,16 @@ contract Fork_Test is Base_Test {
         vm.stopPrank();
 
         // Then: "underlyingToken" is transferred from "depositor" to "recoveryController".
-        assertEq(underlyingToken.balanceOf(vars.depositor), 0);
+        assertEq(underlyingToken.balanceOf(vars.depositor), initialBalanceDepositor);
         assertEq(underlyingToken.balanceOf(address(recoveryController)), vars.depositAmountUT);
     }
 
     function testFork_redeem_NonRecoveredPosition(TestVars memory vars) public {
         // Given: users are unique.
         givenUniqueUsers(vars);
+
+        // Cache initial balances.
+        uint256 initialBalancePrimaryHolder = underlyingToken.balanceOf(vars.primaryHolder);
 
         // And: "primaryHolder" has a valid "wrappedRecoveryToken" balance.
         vars = givenValidBalanceWRT(vars);
@@ -86,31 +89,68 @@ contract Fork_Test is Base_Test {
         vm.prank(users.owner);
         recoveryController.activate();
 
-        // And: No Withdrawals/Deposits of "recoveryToken".
-        vars.withdrawAmountRT = 0;
-        vars.depositAmountRT = 0;
-
         // And: The position is not fully redeemable.
         vars = givenPositionIsNotFullyRedeemable(vars);
 
         // When: A "caller' redeems "primaryHolder".
         recoveryController.redeemUnderlying(vars.primaryHolder);
 
+        // Calculate rounding errors.
+        uint256 maxRoundingError = vars.balanceWRT / 1e18 + 1;
+
         // Then: "depositAmountUT" of "underlyingToken" is transferred from "recoveryController" to "primaryHolder".
-        assertEq(underlyingToken.balanceOf(vars.primaryHolder), vars.depositAmountUT);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
+        assertApproxEqAbs(
+            underlyingToken.balanceOf(vars.primaryHolder),
+            initialBalancePrimaryHolder + vars.depositAmountUT,
+            maxRoundingError
+        );
+        assertApproxEqAbs(underlyingToken.balanceOf(address(recoveryController)), 0, maxRoundingError);
     }
+
+    function testFork_redeem_FullyRecoveredPosition(TestVars memory vars) public {
+        // Given: users are unique.
+        givenUniqueUsers(vars);
+
+        // Cache initial balances.
+        uint256 initialBalancePrimaryHolder = underlyingToken.balanceOf(vars.primaryHolder);
+
+        // And: "primaryHolder" has a valid "wrappedRecoveryToken" balance.
+        vars = givenValidBalanceWRT(vars);
+
+        // And: The Controller is active.
+        vm.prank(users.owner);
+        recoveryController.activate();
+
+        // And: The position is not fully redeemable.
+        vars = givenPositionIsFullyRedeemable(vars);
+
+        // When: A "caller' redeems "primaryHolder".
+        vm.expectEmit(address(underlyingToken));
+        if (vars.depositAmountUT != vars.balanceWRT) {
+            emit Transfer(address(recoveryController), users.owner, vars.depositAmountUT - vars.balanceWRT);
+            vm.expectEmit(address(underlyingToken));
+        }
+        emit Transfer(address(recoveryController), vars.primaryHolder, vars.balanceWRT);
+        recoveryController.redeemUnderlying(vars.primaryHolder);
+
+        // Then: "depositAmountUT" of "underlyingToken" is transferred from "recoveryController" to "primaryHolder".
+        assertEq(underlyingToken.balanceOf(vars.primaryHolder), initialBalancePrimaryHolder + vars.balanceWRT);
+        assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
+        assertEq(underlyingToken.balanceOf(users.owner), vars.depositAmountUT - vars.balanceWRT);
+    }
+
+    // depositRecoveryTokens(uint256) and withdrawRecoveryTokens(uint256) call the same underlying function for
+    // transfers of "underlyingToken" as redeemUnderlying(address), no need to fork test them separately.
 
     /*///////////////////////////////////////////////////////////////
                             HELPERS
     ///////////////////////////////////////////////////////////////*/
 
     function givenUniqueUsers(TestVars memory vars) internal view {
+        vm.assume(vars.primaryHolder != address(0));
         vm.assume(vars.primaryHolder != address(recoveryController));
-        vm.assume(vars.primaryHolder != vars.secondaryHolder);
         vm.assume(vars.primaryHolder != vars.depositor);
-        vm.assume(vars.secondaryHolder != address(recoveryController));
-        vm.assume(vars.secondaryHolder != vars.depositor);
+        vm.assume(vars.depositor != address(0));
         vm.assume(vars.depositor != address(recoveryController));
     }
 
@@ -141,11 +181,32 @@ contract Fork_Test is Base_Test {
         // - Greater than zero.
         // - "totalSupply" does not overflow.
         // - "redeemablePerRTokenGlobal" does not overFlow.
-        // - Position is not fully recoverd: "depositAmountUT < balanceWRT" -> balanceWRT > 1
+        // - Position is not fully recovered: "depositAmountUT < balanceWRT" -> balanceWRT > 1
         vars.depositAmountUT = bound(vars.depositAmountUT, 1, type(uint256).max - underlyingToken.totalSupply());
         vars.depositAmountUT = bound(vars.depositAmountUT, 1, type(uint256).max / 1e18);
         vm.assume(vars.balanceWRT > 1);
         vars.depositAmountUT = bound(vars.depositAmountUT, 1, vars.balanceWRT - 1);
+
+        deal(address(underlyingToken), vars.depositor, vars.depositAmountUT, true);
+
+        vm.startPrank(vars.depositor);
+        underlyingToken.approve(address(recoveryController), vars.depositAmountUT);
+        recoveryController.depositUnderlying(vars.depositAmountUT);
+        vm.stopPrank();
+
+        return vars;
+    }
+
+    function givenPositionIsFullyRedeemable(TestVars memory vars) internal returns (TestVars memory) {
+        // Constraints "depositAmountUT":
+        // - Greater than zero.
+        // - "totalSupply" does not overflow.
+        // - "redeemablePerRTokenGlobal" does not overFlow.
+        // - Position is fully recovered: "depositAmountUT >= balanceWRT".
+        vars.depositAmountUT = bound(vars.depositAmountUT, 1, type(uint256).max - underlyingToken.totalSupply());
+        vars.depositAmountUT = bound(vars.depositAmountUT, 1, type(uint256).max / 1e18);
+        vm.assume(vars.balanceWRT > 1);
+        vars.balanceWRT = bound(vars.balanceWRT, 1, vars.depositAmountUT);
 
         deal(address(underlyingToken), vars.depositor, vars.depositAmountUT, true);
 
