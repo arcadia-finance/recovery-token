@@ -12,6 +12,9 @@ import {StdStorage, stdStorage} from "../../../lib/forge-std/src/Test.sol";
 
 import {UserState, ControllerState} from "../../utils/Types.sol";
 
+/**
+ * @notice Fuzz tests for the Recovery Token logic of "RecoveryController".
+ */
 contract RecoveryTokenLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
     using FixedPointMathLib for uint256;
     using stdStorage for StdStorage;

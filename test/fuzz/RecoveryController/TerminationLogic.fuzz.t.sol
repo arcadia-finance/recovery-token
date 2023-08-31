@@ -8,6 +8,9 @@ import {RecoveryController_Fuzz_Test} from "../RecoveryController.fuzz.t.sol";
 
 import {ControllerState} from "../../utils/Types.sol";
 
+/**
+ * @notice Fuzz tests for the termination logic of "RecoveryController".
+ */
 contract Termination_Fuzz_Test is RecoveryController_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                               SETUP

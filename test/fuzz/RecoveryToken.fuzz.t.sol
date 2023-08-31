@@ -11,6 +11,9 @@ import {StdStorage, stdStorage} from "../../lib/forge-std/src/Test.sol";
 
 import {RecoveryTokenExtension} from "../utils/Extensions.sol";
 
+/**
+ * @notice Fuzz tests for "RecoveryToken".
+ */
 contract RecoveryToken_Fuzz_Test is Fuzz_Test {
     using stdStorage for StdStorage;
     /* ///////////////////////////////////////////////////////////////

@@ -8,6 +8,12 @@ import {Base_Test} from "../Base.t.sol";
 
 import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 
+/**
+ * @notice Common logic needed by all fork tests.
+ * @dev Each function that interacts with an external and deployed contract, must be fork tested with the actual deployed bytecode of said contract.
+ * @dev While not always possible (since unlike with the fuzz tests, it is not possible to work with extension with the necessary getters and setter),
+ * as much of the possible state configurations must be tested.
+ */
 abstract contract Fork_Test is Base_Test {
     /*///////////////////////////////////////////////////////////////
                             CONSTANTS

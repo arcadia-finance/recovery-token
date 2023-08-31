@@ -9,10 +9,13 @@ import {Fuzz_Test} from "./Fuzz.t.sol";
 import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 import {StdStorage, stdStorage} from "../../lib/forge-std/src/Test.sol";
 
-import {RecoveryToken} from "../../src/RecoveryToken.sol";
 import {RecoveryControllerExtension} from "../utils/Extensions.sol";
+import {RecoveryToken} from "../../src/RecoveryToken.sol";
 import {UserState, ControllerState} from "../utils/Types.sol";
 
+/**
+ * @notice Common logic needed by all "RecoveryController" fuzz tests.
+ */
 abstract contract RecoveryController_Fuzz_Test is Fuzz_Test {
     using stdStorage for StdStorage;
 

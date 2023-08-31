@@ -4,7 +4,9 @@
  */
 pragma solidity 0.8.19;
 
-/// @notice Abstract contract containing all the events emitted by the protocol.
+/**
+ * @notice Abstract contract containing all the events emitted by the protocol.
+ */
 abstract contract Events {
     /*//////////////////////////////////////////////////////////////
                         RECOVERY CONTROLLER

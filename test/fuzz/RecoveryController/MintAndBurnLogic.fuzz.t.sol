@@ -8,6 +8,9 @@ import {RecoveryController_Fuzz_Test} from "../RecoveryController.fuzz.t.sol";
 
 import {UserState} from "../../utils/Types.sol";
 
+/**
+ * @notice Fuzz tests for the mint and burn logic of "RecoveryController".
+ */
 contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                               SETUP
@@ -73,8 +76,8 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
         uint256[2] calldata amounts
     ) public {
         // Cast between fixed size arrays and dynamic size array.
-        address[] memory tos_ = castArrayFixedToDynamic(tos);
-        uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
+        address[] memory tos_ = castArrayStaticToDynamic(tos);
+        uint256[] memory amounts_ = castArrayStaticToDynamic(amounts);
 
         // Given: Caller is not the "owner".
         vm.assume(unprivilegedAddress != users.owner);
@@ -88,8 +91,8 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
 
     function testFuzz_Revert_batchMint_Active(address[2] calldata tos, uint256[2] calldata amounts) public {
         // Cast between fixed size arrays and dynamic size array.
-        address[] memory tos_ = castArrayFixedToDynamic(tos);
-        uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
+        address[] memory tos_ = castArrayStaticToDynamic(tos);
+        uint256[] memory amounts_ = castArrayStaticToDynamic(amounts);
 
         // Given: "RecoveryController" is active.
         vm.prank(users.owner);
@@ -104,7 +107,7 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
 
     function testFuzz_Revert_batchMint_LengthMismatch(address[2] calldata tos, uint256[] calldata amounts) public {
         // Cast between fixed size arrays and dynamic size array.
-        address[] memory tos_ = castArrayFixedToDynamic(tos);
+        address[] memory tos_ = castArrayStaticToDynamic(tos);
 
         // Given: "RecoveryController" is not active.
 
@@ -125,9 +128,9 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
         uint256[2] calldata amounts
     ) public {
         // Cast between fixed size arrays and dynamic size array.
-        address[] memory tos_ = castArrayFixedToDynamic(tos);
-        uint256[] memory initialBalanceTos_ = castArrayFixedToDynamic(initialBalanceTos);
-        uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
+        address[] memory tos_ = castArrayStaticToDynamic(tos);
+        uint256[] memory initialBalanceTos_ = castArrayStaticToDynamic(initialBalanceTos);
+        uint256[] memory amounts_ = castArrayStaticToDynamic(amounts);
         vm.assume(uniqueAddresses(tos_));
 
         // Given: "RecoveryController" is not active.
@@ -170,7 +173,7 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
 
     function testFuzz_Revert_batchBurn_LengthMismatch(address[2] calldata froms, uint256[] calldata amounts) public {
         // Cast between fixed size arrays and dynamic size array.
-        address[] memory froms_ = castArrayFixedToDynamic(froms);
+        address[] memory froms_ = castArrayStaticToDynamic(froms);
 
         // Given: "RecoveryController" is not active.
 
@@ -246,8 +249,8 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
         uint256[2] calldata amounts
     ) public {
         // Cast between fixed size arrays and dynamic size array.
-        address[] memory froms_ = castArrayFixedToDynamic(froms);
-        uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
+        address[] memory froms_ = castArrayStaticToDynamic(froms);
+        uint256[] memory amounts_ = castArrayStaticToDynamic(amounts);
 
         // Given: Caller is not the "owner".
         vm.assume(unprivilegedAddress != users.owner);
@@ -264,8 +267,8 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
         uint256[2] calldata amounts,
         uint256 controllerBalanceRT
     ) public {
-        UserState[] memory froms_ = castArrayFixedToDynamicUserState(froms);
-        uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
+        UserState[] memory froms_ = castArrayStaticToDynamicUserState(froms);
+        uint256[] memory amounts_ = castArrayStaticToDynamic(amounts);
         vm.assume(uniqueUsers(froms_));
 
         // Cache variables.
@@ -316,8 +319,8 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
         uint256[2] calldata amounts,
         uint256 controllerBalanceRT
     ) public {
-        UserState[] memory froms_ = castArrayFixedToDynamicUserState(froms);
-        uint256[] memory amounts_ = castArrayFixedToDynamic(amounts);
+        UserState[] memory froms_ = castArrayStaticToDynamicUserState(froms);
+        uint256[] memory amounts_ = castArrayStaticToDynamic(amounts);
         vm.assume(uniqueUsers(froms_));
 
         // Cache variables.

@@ -6,7 +6,6 @@ pragma solidity 0.8.19;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 
-import {Constants} from "./utils/Constants.sol";
 import {ERC20, ERC20Mock} from "./mocks/ERC20Mock.sol";
 import {Errors} from "./utils/Errors.sol";
 import {Events} from "./utils/Events.sol";

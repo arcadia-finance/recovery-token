@@ -6,6 +6,9 @@ pragma solidity 0.8.19;
 
 import {Fork_Test} from "./Fork.t.sol";
 
+/**
+ * @notice Fork tests for "RecoveryToken".
+ */
 contract RecoveryController_Fork_Test is Fork_Test {
     /*///////////////////////////////////////////////////////////////
                             CONSTANTS

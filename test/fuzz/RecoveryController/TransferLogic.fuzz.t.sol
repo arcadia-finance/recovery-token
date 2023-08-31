@@ -6,6 +6,9 @@ pragma solidity 0.8.19;
 
 import {RecoveryController_Fuzz_Test} from "../RecoveryController.fuzz.t.sol";
 
+/**
+ * @notice Fuzz tests for the transfer logic of "RecoveryController".
+ */
 contract TransferLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                               SETUP

@@ -7,7 +7,7 @@ pragma solidity 0.8.19;
 import {StdUtils} from "../../lib/forge-std/src/StdUtils.sol";
 
 /**
- * @notice Contract deployed for each Invariant test to share state across different handlers.
+ * @notice Contract deployed for each invariant test to share state across different handlers.
  */
 contract SharedHandlerState is StdUtils {
     /*//////////////////////////////////////////////////////////////

@@ -12,6 +12,7 @@ import {SharedHandlerState} from "./SharedHandlerState.sol";
 
 /**
  * @notice Common logic needed by all invariant tests.
+ * @dev All invariants, especially those used to bound the solution space in fuzz tests, must be tested.
  */
 abstract contract Invariant_Test is Base_Test {
     /*//////////////////////////////////////////////////////////////////////////

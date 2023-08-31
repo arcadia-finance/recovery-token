@@ -6,9 +6,9 @@ pragma solidity 0.8.19;
 
 import {ERC20} from "../lib/solmate/src/tokens/ERC20.sol";
 import {Owned} from "../lib/solmate/src/auth/Owned.sol";
-import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
+
 import {RecoveryToken} from "./RecoveryToken.sol";
 
 /**
@@ -24,8 +24,8 @@ import {RecoveryToken} from "./RecoveryToken.sol";
  * to do the accounting of deposited Recovery Token Balances.
  */
 contract RecoveryController is ERC20, Owned {
-    using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
+    using SafeTransferLib for ERC20;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
