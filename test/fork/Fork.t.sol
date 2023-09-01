@@ -28,16 +28,16 @@ abstract contract Fork_Test is Base_Test {
 
     uint256 internal fork;
 
-    /*///////////////////////////////////////////////////////////////
-                            SET-UP FUNCTION
-    ///////////////////////////////////////////////////////////////*/
-
     struct TestVars {
         address primaryHolder;
         address depositor;
         uint256 balanceWRT;
         uint256 depositAmountUT;
     }
+
+    /*///////////////////////////////////////////////////////////////
+                            SET-UP FUNCTION
+    ///////////////////////////////////////////////////////////////*/
 
     function setUp() public virtual override {
         // Fork Optimism via Tenderly.

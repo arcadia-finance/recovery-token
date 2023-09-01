@@ -34,9 +34,6 @@ contract RecoveryController_Fork_Test is Fork_Test {
         // Given: Users are unique.
         givenUniqueUsers(vars);
 
-        // Cache initial balances.
-        uint256 initialBalanceDepositor = underlyingToken.balanceOf(vars.depositor);
-
         // And: "primaryHolder" has a valid "wrappedRecoveryToken" balance.
         vars = givenValidBalanceWRT(vars);
 
@@ -61,7 +58,7 @@ contract RecoveryController_Fork_Test is Fork_Test {
         vm.stopPrank();
 
         // Then: "underlyingToken" is transferred from "depositor" to "recoveryController".
-        assertEq(underlyingToken.balanceOf(vars.depositor), initialBalanceDepositor);
+        assertEq(underlyingToken.balanceOf(vars.depositor), 0);
         assertEq(underlyingToken.balanceOf(address(recoveryController)), vars.depositAmountUT);
     }
 
@@ -81,10 +78,8 @@ contract RecoveryController_Fork_Test is Fork_Test {
         // When: A "caller' redeems "primaryHolder".
         recoveryController.redeemUnderlying(vars.primaryHolder);
 
-        // Calculate rounding errors.
-        uint256 maxRoundingError = vars.balanceWRT / 1e18 + 1;
-
         // Then: "depositAmountUT" of "underlyingToken" is transferred from "recoveryController" to "primaryHolder".
+        uint256 maxRoundingError = vars.balanceWRT / 1e18 + 1;
         assertApproxEqAbs(
             underlyingToken.balanceOf(vars.primaryHolder),
             initialBalancePrimaryHolder + vars.depositAmountUT,
