@@ -197,7 +197,6 @@ contract RecoveryController is ERC20, Owned {
      * @notice Batch mints Wrapped Recovery Tokens.
      * @param tos Array with addresses that receives the minted tokens.
      * @param amounts Array with amounts of tokens minted.
-     * @dev Mints an amount of (unwrapped) Recovery Tokens equal to sum of all amounts.
      * @dev Mints an amount of Recovery Tokens to the controller,
      * equal to the sum of all minted Wrapped Recovery Tokens.
      */
