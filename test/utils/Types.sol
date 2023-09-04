@@ -8,8 +8,8 @@ struct Users {
     address payable tokenCreator;
     address payable creator;
     address payable owner;
-    address payable aggrievedUser0;
-    address payable aggrievedUser1;
+    address payable holderWRT0;
+    address payable holderWRT1;
     address payable alice;
     address payable bob;
 }

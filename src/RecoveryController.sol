@@ -6,16 +6,16 @@ pragma solidity 0.8.19;
 
 import {ERC20} from "../lib/solmate/src/tokens/ERC20.sol";
 import {Owned} from "../lib/solmate/src/auth/Owned.sol";
-import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
+
 import {RecoveryToken} from "./RecoveryToken.sol";
 
 /**
- * @title Recovery Tokens.
+ * @title Recovery Controller.
  * @author Pragma Labs
  * @notice Handles the accounting and redemption of Recovery Tokens for Underlying Tokens,
- * both if assets are redeemed via legal means, or if the lost assets are redeemed via other means..
+ * both if assets are redeemed via legal means, or if the lost assets are redeemed via other means.
  * In the second situation the underlying assets will be distributed pro-rata to all holders of
  * Wrapped Recovery Tokens in discrete batches.
  * @dev Recovery Tokens can be redeemed one-to-one for Underlying Tokens.
@@ -24,8 +24,8 @@ import {RecoveryToken} from "./RecoveryToken.sol";
  * to do the accounting of deposited Recovery Token Balances.
  */
 contract RecoveryController is ERC20, Owned {
-    using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
+    using SafeTransferLib for ERC20;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
@@ -197,7 +197,6 @@ contract RecoveryController is ERC20, Owned {
      * @notice Batch mints Wrapped Recovery Tokens.
      * @param tos Array with addresses that receives the minted tokens.
      * @param amounts Array with amounts of tokens minted.
-     * @dev Mints an amount of (unwrapped) Recovery Tokens equal to sum of all amounts.
      * @dev Mints an amount of Recovery Tokens to the controller,
      * equal to the sum of all minted Wrapped Recovery Tokens.
      */

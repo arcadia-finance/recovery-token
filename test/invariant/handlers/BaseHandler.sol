@@ -7,9 +7,12 @@ pragma solidity 0.8.19;
 import {CommonBase} from "../../../lib/forge-std/src/Base.sol";
 import {StdCheats} from "../../../lib/forge-std/src/StdCheats.sol";
 import {StdUtils} from "../../../lib/forge-std/src/StdUtils.sol";
+
 import {SharedHandlerState} from "../SharedHandlerState.sol";
 
-/// @notice Base contract with common logic needed by all handler contracts.
+/**
+ * @notice Base contract with common logic needed by all handler contracts.
+ */
 abstract contract BaseHandler is CommonBase, StdCheats, StdUtils {
     /*//////////////////////////////////////////////////////////////////////////
                                      CONSTANTS

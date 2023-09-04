@@ -7,6 +7,11 @@ pragma solidity 0.8.19;
 import {RecoveryController} from "../../src/RecoveryController.sol";
 import {RecoveryToken} from "../../src/RecoveryToken.sol";
 
+/**
+ * @notice Extension contracts allow access to internal functions and the creation of getters and setters for all variables.
+ * This allows free modification of the state for both the test contracts as integrations with third party contracts.
+ * As such the complete space of possible state configurations can be tested.
+ */
 contract RecoveryControllerExtension is RecoveryController {
     constructor(address underlying_) RecoveryController(underlying_) {}
 

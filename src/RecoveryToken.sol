@@ -7,6 +7,8 @@ pragma solidity 0.8.19;
 import {ERC20} from "../lib/solmate/src/tokens/ERC20.sol";
 import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 
+import {IRecoveryToken} from "./interfaces/IRecoveryToken.sol";
+
 /**
  * @title Arcadia Recovery Tokens.
  * @author Pragma Labs
@@ -14,7 +16,7 @@ import {Owned} from "../lib/solmate/src/auth/Owned.sol";
  * @dev The one-to-one redemption of Recovery Tokens for Underlying Tokens,
  * is handled by the Recovery Controller.
  */
-contract RecoveryToken is ERC20, Owned {
+contract RecoveryToken is IRecoveryToken, ERC20, Owned {
     /*//////////////////////////////////////////////////////////////
                                STORAGE
     //////////////////////////////////////////////////////////////*/

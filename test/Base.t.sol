@@ -5,17 +5,19 @@
 pragma solidity 0.8.19;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {Constants} from "./utils/Constants.sol";
+
+import {ERC20, ERC20Mock} from "./mocks/ERC20Mock.sol";
 import {Errors} from "./utils/Errors.sol";
 import {Events} from "./utils/Events.sol";
-import {ERC20, ERC20Mock} from "./mocks/ERC20Mock.sol";
-import {RecoveryToken} from "../src/RecoveryToken.sol";
 import {RecoveryController} from "../src/RecoveryController.sol";
+import {RecoveryToken} from "../src/RecoveryToken.sol";
 import {Users} from "./utils/Types.sol";
 import {Utils} from "./utils/Utils.sol";
 
-/// @notice Base test contract with common logic needed by all tests.
-abstract contract Base_Test is Test, Events, Errors, Utils {
+/**
+ * @notice Base test contract with common logic needed by all tests.
+ */
+abstract contract Base_Test is Test, Errors, Events, Utils {
     /*//////////////////////////////////////////////////////////////////////////
                                      VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
@@ -41,8 +43,8 @@ abstract contract Base_Test is Test, Events, Errors, Utils {
             creator: createUser("creator"),
             owner: users.creator,
             tokenCreator: createUser("tokenCreator"),
-            aggrievedUser0: createUser("aggrievedUser0"),
-            aggrievedUser1: createUser("aggrievedUser1"),
+            holderWRT0: createUser("holderWRT0"),
+            holderWRT1: createUser("holderWRT1"),
             alice: createUser("alice"),
             bob: createUser("bob")
         });
@@ -80,8 +82,4 @@ abstract contract Base_Test is Test, Events, Errors, Utils {
         vm.label({account: address(recoveryToken), newLabel: "RecoveryToken"});
         vm.label({account: address(recoveryController), newLabel: "RecoveryController"});
     }
-
-    /*//////////////////////////////////////////////////////////////////////////
-                                    CALL EXPECTS
-    //////////////////////////////////////////////////////////////////////////*/
 }

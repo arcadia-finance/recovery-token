@@ -5,9 +5,12 @@
 pragma solidity 0.8.19;
 
 import {Invariant_Test} from "./Invariant.t.sol";
+
 import {InactiveRecoveryControllerHandler} from "./handlers/InactiveRecoveryControllerHandler.sol";
 
-/// @notice Common logic needed by all invariant tests.
+/**
+ * @notice Invariant tests for when the "RecoveryController" is not activated.
+ */
 contract Inactive_Invariant_Test is Invariant_Test {
     /*//////////////////////////////////////////////////////////////////////////
                                      VARIABLES
@@ -43,8 +46,8 @@ contract Inactive_Invariant_Test is Invariant_Test {
         excludeSender(address(recoveryControllerHandler));
 
         // Add actors who should receive Recovery Tokens.
-        state.addActor(users.aggrievedUser0);
-        state.addActor(users.aggrievedUser1);
+        state.addActor(users.holderWRT0);
+        state.addActor(users.holderWRT1);
     }
 
     /*//////////////////////////////////////////////////////////////////////////

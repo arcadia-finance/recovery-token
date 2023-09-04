@@ -5,9 +5,16 @@
 pragma solidity 0.8.19;
 
 import {Base_Test} from "../Base.t.sol";
+
 import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 
-contract Fork_Test is Base_Test {
+/**
+ * @notice Common logic needed by all fork tests.
+ * @dev Each function that interacts with an external and deployed contract, must be fork tested with the actual deployed bytecode of said contract.
+ * @dev While not always possible (since unlike with the fuzz tests, it is not possible to work with extension with the necessary getters and setter),
+ * as much of the possible state configurations must be tested.
+ */
+abstract contract Fork_Test is Base_Test {
     /*///////////////////////////////////////////////////////////////
                             CONSTANTS
     ///////////////////////////////////////////////////////////////*/
@@ -21,10 +28,6 @@ contract Fork_Test is Base_Test {
 
     uint256 internal fork;
 
-    /*///////////////////////////////////////////////////////////////
-                            SET-UP FUNCTION
-    ///////////////////////////////////////////////////////////////*/
-
     struct TestVars {
         address primaryHolder;
         address depositor;
@@ -32,7 +35,11 @@ contract Fork_Test is Base_Test {
         uint256 depositAmountUT;
     }
 
-    function setUp() public override {
+    /*///////////////////////////////////////////////////////////////
+                            SET-UP FUNCTION
+    ///////////////////////////////////////////////////////////////*/
+
+    function setUp() public virtual override {
         // Fork Optimism via Tenderly.
         fork = vm.createFork(RPC_URL);
         vm.selectFork(fork);
@@ -46,100 +53,6 @@ contract Fork_Test is Base_Test {
         // Deploy Recovery Contracts.
         deployRecoveryContracts();
     }
-
-    function testFork_deposit(TestVars memory vars) public {
-        // Given: Users are unique.
-        givenUniqueUsers(vars);
-
-        // Cache initial balances.
-        uint256 initialBalanceDepositor = underlyingToken.balanceOf(vars.depositor);
-
-        // And: "primaryHolder" has a valid "wrappedRecoveryToken" balance.
-        vars = givenValidBalanceWRT(vars);
-
-        // And: "depositor" has a valid "underlyingToken" balance of "depositAmountUT":
-        vars = givenValidDepositAmountUT(vars);
-
-        // And: State is persisted.
-        vm.prank(users.owner);
-        recoveryController.mint(vars.primaryHolder, vars.balanceWRT);
-        deal(address(underlyingToken), vars.depositor, vars.depositAmountUT, true);
-
-        // And: The Controller is active.
-        vm.prank(users.owner);
-        recoveryController.activate();
-
-        // When: A "depositor" deposits "amount" of "underlyingToken".
-        vm.startPrank(vars.depositor);
-        underlyingToken.approve(address(recoveryController), vars.depositAmountUT);
-        vm.expectEmit(address(underlyingToken));
-        emit Transfer(vars.depositor, address(recoveryController), vars.depositAmountUT);
-        recoveryController.depositUnderlying(vars.depositAmountUT);
-        vm.stopPrank();
-
-        // Then: "underlyingToken" is transferred from "depositor" to "recoveryController".
-        assertEq(underlyingToken.balanceOf(vars.depositor), initialBalanceDepositor);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), vars.depositAmountUT);
-    }
-
-    function testFork_redeem_NonRecoveredPosition(TestVars memory vars) public {
-        // Given: users are unique.
-        givenUniqueUsers(vars);
-
-        // Cache initial balances.
-        uint256 initialBalancePrimaryHolder = underlyingToken.balanceOf(vars.primaryHolder);
-
-        // And: The position is not fully redeemable.
-        vars = givenPositionIsNotFullyRedeemable(vars);
-
-        // And: State is persisted.
-        mintAndDeposit(vars);
-
-        // When: A "caller' redeems "primaryHolder".
-        recoveryController.redeemUnderlying(vars.primaryHolder);
-
-        // Calculate rounding errors.
-        uint256 maxRoundingError = vars.balanceWRT / 1e18 + 1;
-
-        // Then: "depositAmountUT" of "underlyingToken" is transferred from "recoveryController" to "primaryHolder".
-        assertApproxEqAbs(
-            underlyingToken.balanceOf(vars.primaryHolder),
-            initialBalancePrimaryHolder + vars.depositAmountUT,
-            maxRoundingError
-        );
-        assertApproxEqAbs(underlyingToken.balanceOf(address(recoveryController)), 0, maxRoundingError);
-    }
-
-    function testFork_redeem_FullyRecoveredPosition(TestVars memory vars) public {
-        // Given: users are unique.
-        givenUniqueUsers(vars);
-
-        // Cache initial balances.
-        uint256 initialBalancePrimaryHolder = underlyingToken.balanceOf(vars.primaryHolder);
-
-        // And: The position is fully redeemable.
-        vars = givenPositionIsFullyRedeemable(vars);
-
-        // And: State is persisted.
-        mintAndDeposit(vars);
-
-        // When: A "caller' redeems for "primaryHolder".
-        if (vars.depositAmountUT != vars.balanceWRT) {
-            vm.expectEmit(address(underlyingToken));
-            emit Transfer(address(recoveryController), users.owner, vars.depositAmountUT - vars.balanceWRT);
-        }
-        vm.expectEmit(address(underlyingToken));
-        emit Transfer(address(recoveryController), vars.primaryHolder, vars.balanceWRT);
-        recoveryController.redeemUnderlying(vars.primaryHolder);
-
-        // Then: "depositAmountUT" of "underlyingToken" is transferred from "recoveryController" to "primaryHolder".
-        assertEq(underlyingToken.balanceOf(vars.primaryHolder), initialBalancePrimaryHolder + vars.balanceWRT);
-        assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
-        assertEq(underlyingToken.balanceOf(users.owner), vars.depositAmountUT - vars.balanceWRT);
-    }
-
-    // depositRecoveryTokens(uint256) and withdrawRecoveryTokens(uint256) call the same underlying function for
-    // transfers of "underlyingToken" as redeemUnderlying(address), no need to fork test them separately.
 
     /*///////////////////////////////////////////////////////////////
                             HELPERS
