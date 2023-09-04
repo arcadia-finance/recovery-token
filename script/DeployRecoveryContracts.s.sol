@@ -53,7 +53,7 @@ contract DeployRecoveryContracts is Script {
         recoveryController.batchMint(tos, amounts);
     }
 
-    function getMintData() internal returns (uint256[] memory amounts, address[] memory tos) {
+    function getMintData() internal view returns (uint256[] memory amounts, address[] memory tos) {
         // Read Json.
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script/mint_data.json");
