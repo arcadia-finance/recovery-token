@@ -41,9 +41,7 @@ contract RecoveryControllerExtension is RecoveryController {
 }
 
 contract RecoveryTokenExtension is RecoveryToken {
-    constructor(address owner_, address recoveryController_, uint8 decimals_)
-        RecoveryToken(owner_, recoveryController_, decimals_)
-    {}
+    constructor(address recoveryController_, uint8 decimals_) RecoveryToken(recoveryController_, decimals_) {}
 
     function getRecoveryController() public view returns (address recoveryController_) {
         recoveryController_ = recoveryController;

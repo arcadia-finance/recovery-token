@@ -5,7 +5,6 @@
 pragma solidity 0.8.19;
 
 import {ERC20} from "../lib/solmate/src/tokens/ERC20.sol";
-import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 
 import {IRecoveryToken} from "./interfaces/IRecoveryToken.sol";
 
@@ -16,7 +15,7 @@ import {IRecoveryToken} from "./interfaces/IRecoveryToken.sol";
  * @dev The one-to-one redemption of Recovery Tokens for Underlying Tokens,
  * is handled by the Recovery Controller.
  */
-contract RecoveryToken is IRecoveryToken, ERC20, Owned {
+contract RecoveryToken is IRecoveryToken, ERC20 {
     /*//////////////////////////////////////////////////////////////
                                STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -49,14 +48,10 @@ contract RecoveryToken is IRecoveryToken, ERC20, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param owner_ The address of owner of the contract.
      * @param recoveryController_ The contract address of the Recovery Controller.
      * @param decimals_ Must be identical to decimals of the Underlying Token.
      */
-    constructor(address owner_, address recoveryController_, uint8 decimals_)
-        ERC20("Arcadia Recovery Token", "ART", decimals_)
-        Owned(owner_)
-    {
+    constructor(address recoveryController_, uint8 decimals_) ERC20("Arcadia Recovery Token", "ART", decimals_) {
         recoveryController = recoveryController_;
     }
 
