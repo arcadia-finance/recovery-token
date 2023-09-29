@@ -47,9 +47,12 @@ contract Mint_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test {
         recoveryControllerExtension.mint(to, amount);
     }
 
-    function testFuzz_Success_mint(address to, uint256 initialBalanceTo, uint256 initialBalanceController, uint256 amount)
-        public
-    {
+    function testFuzz_Success_mint(
+        address to,
+        uint256 initialBalanceTo,
+        uint256 initialBalanceController,
+        uint256 amount
+    ) public {
         // Given: "RecoveryController" is not active.
         // And: Balance "recoveryController" does not overflow after mint of "amount".
         vm.assume(amount <= type(uint256).max - initialBalanceController);

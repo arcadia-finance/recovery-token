@@ -23,9 +23,10 @@ contract MaxRedeemable_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_T
     /* ///////////////////////////////////////////////////////////////
                                 TESTS
     /////////////////////////////////////////////////////////////// */
-    function testFuzz_Success_maxRedeemable_NonRecoveredPosition(UserState memory user, ControllerState memory controller)
-        public
-    {
+    function testFuzz_Success_maxRedeemable_NonRecoveredPosition(
+        UserState memory user,
+        ControllerState memory controller
+    ) public {
         // Given: "user" is not the "recoveryController".
         vm.assume(user.addr != address(recoveryControllerExtension));
 
