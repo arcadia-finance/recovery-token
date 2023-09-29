@@ -136,7 +136,7 @@ contract RecoveryController is ERC20, Owned {
         Owned(msg.sender)
     {
         underlying = underlying_;
-        recoveryToken = new RecoveryToken(msg.sender, address(this), decimals);
+        recoveryToken = new RecoveryToken(address(this), decimals);
 
         emit ActivationSet(false);
     }

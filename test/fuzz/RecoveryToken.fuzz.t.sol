@@ -34,8 +34,7 @@ contract RecoveryToken_Fuzz_Test is Fuzz_Test {
         Fuzz_Test.setUp();
 
         // Deploy Recovery Token contract.
-        recoveryTokenExtension =
-            new RecoveryTokenExtension(users.creator, address(recoveryController), underlyingToken.decimals());
+        recoveryTokenExtension = new RecoveryTokenExtension(address(recoveryController), underlyingToken.decimals());
 
         // Label the contract.
         vm.label({account: address(recoveryToken), newLabel: "RecoveryToken"});
@@ -45,10 +44,9 @@ contract RecoveryToken_Fuzz_Test is Fuzz_Test {
                             DEPLOYMENT
     /////////////////////////////////////////////////////////////// */
 
-    function testFuzz_Pass_deployment(address owner_, address recoveryController_, uint8 decimals_) public {
-        recoveryTokenExtension = new RecoveryTokenExtension(owner_, recoveryController_, decimals_);
+    function testFuzz_Pass_deployment(address recoveryController_, uint8 decimals_) public {
+        recoveryTokenExtension = new RecoveryTokenExtension(recoveryController_, decimals_);
 
-        assertEq(recoveryTokenExtension.owner(), owner_);
         assertEq(recoveryTokenExtension.getRecoveryController(), recoveryController_);
         assertEq(recoveryTokenExtension.decimals(), decimals_);
     }
