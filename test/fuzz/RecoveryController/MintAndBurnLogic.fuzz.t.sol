@@ -171,76 +171,74 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
         recoveryControllerExtension.burn(from, amount);
     }
 
-    function testFuzz_Revert_batchBurn_LengthMismatch(address[2] calldata froms, uint256[] calldata amounts) public {
-        // Cast between fixed size arrays and dynamic size array.
-        address[] memory froms_ = castArrayStaticToDynamic(froms);
-
-        // Given: "RecoveryController" is not active.
-
-        // And: Length of both input arrays is not equal (test-condition LengthMismatch).
-        vm.assume(froms.length != amounts.length);
-
-        // When: "owner" burns "amounts" from "froms".
-        // Then: Transaction should revert with "LengthMismatch".
+    function testFuzz_Revert_burn_Active(address from, uint256 amount) public {
+        // Given: "RecoveryController" is active.
         vm.prank(users.owner);
-        vm.expectRevert(LengthMismatch.selector);
-        recoveryControllerExtension.batchBurn(froms_, amounts);
+        recoveryControllerExtension.activate();
+
+        // When: "owner" burns "amount" from "from".
+        // Then: Transaction should revert with "Active".
+        vm.prank(users.owner);
+        vm.expectRevert(Active.selector);
+        recoveryControllerExtension.burn(from, amount);
     }
 
     function testFuzz_Pass_burn_PositionPartiallyClosed(
-        UserState memory user,
+        address from,
+        uint256 initialBalanceFrom,
         uint256 amount,
         uint256 controllerBalanceRT
     ) public {
-        // Given: "amount" is strictly smaller as "openPosition" (test-condition PositionPartiallyClosed).
-        // -> userBalanceWRT is also at least 1.
-        user.balanceWRT = bound(user.balanceWRT, 1, type(uint256).max);
-        user.redeemed = bound(user.redeemed, 0, user.balanceWRT - 1); // Invariant.
-        uint256 openPosition = user.balanceWRT - user.redeemed;
-        amount = bound(amount, 0, openPosition - 1);
+        // Given: "amount" is strictly smaller as "initialBalanceFrom" (test-condition PositionPartiallyClosed).
+        // -> "initialBalanceFrom" is also at least 1.
+        initialBalanceFrom = bound(initialBalanceFrom, 1, type(uint256).max);
+        amount = bound(amount, 0, initialBalanceFrom - 1);
 
-        // And: "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
-        controllerBalanceRT = bound(controllerBalanceRT, openPosition, type(uint256).max);
+        // And: "initialBalanceFrom" is smaller or equal to "initialBalanceController" (Invariant!).
+        controllerBalanceRT = bound(controllerBalanceRT, initialBalanceFrom, type(uint256).max);
 
         // And: State is persisted.
-        setUserState(user);
+        vm.prank(users.owner);
+        recoveryControllerExtension.mint(from, initialBalanceFrom);
         deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
 
         // When: "owner" burns "amount" from "from".
         vm.prank(users.owner);
-        recoveryControllerExtension.burn(user.addr, amount);
+        recoveryControllerExtension.burn(from, amount);
 
         // Then: "wrappedRecoveryToken" balance of "user" should decrease with "amount".
-        assertEq(wrappedRecoveryToken.balanceOf(user.addr), user.balanceWRT - amount);
+        assertEq(wrappedRecoveryToken.balanceOf(from), initialBalanceFrom - amount);
         // And: "recoveryToken" balance of "recoveryController" should decrease with "amount".
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - amount);
     }
 
-    function testFuzz_Pass_burn_PositionFullyClosed(UserState memory user, uint256 amount, uint256 controllerBalanceRT)
-        public
-    {
-        // Given: "amount" is greater or equal as "openPosition" (test-condition PositionPartiallyClosed).
-        user.redeemed = bound(user.redeemed, 0, user.balanceWRT); // Invariant.
-        uint256 openPosition = user.balanceWRT - user.redeemed;
-        amount = bound(amount, openPosition, type(uint256).max);
+    function testFuzz_Pass_burn_PositionFullyClosed(
+        address from,
+        uint256 initialBalanceFrom,
+        uint256 amount,
+        uint256 controllerBalanceRT
+    ) public {
+        // Given: "amount" is greater or equal as "initialBalanceFrom" (test-condition PositionPartiallyClosed).
+        amount = bound(amount, initialBalanceFrom, type(uint256).max);
 
-        // And: "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
-        controllerBalanceRT = bound(controllerBalanceRT, openPosition, type(uint256).max);
+        // And: "initialBalanceFrom" is smaller or equal to "initialBalanceController" (Invariant!).
+        controllerBalanceRT = bound(controllerBalanceRT, initialBalanceFrom, type(uint256).max);
 
         // And: State is persisted.
-        setUserState(user);
+        vm.prank(users.owner);
+        recoveryControllerExtension.mint(from, initialBalanceFrom);
         deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
 
         // When: "owner" burns "amount" from "from".
         vm.prank(users.owner);
-        recoveryControllerExtension.burn(user.addr, amount);
+        recoveryControllerExtension.burn(from, amount);
 
         // Then: "user" state variables are updated.
-        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
-        assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
-        assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
-        // And: "recoveryToken" balance of "recoveryController" should decrease with "openPosition".
-        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - openPosition);
+        assertEq(wrappedRecoveryToken.balanceOf(from), 0);
+        // And: "recoveryToken" balance of "recoveryController" should decrease with "initialBalanceFrom".
+        assertEq(
+            recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - initialBalanceFrom
+        );
     }
 
     function testFuzz_Revert_batchBurn_NonOwner(
@@ -262,34 +260,63 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
         recoveryControllerExtension.batchBurn(froms_, amounts_);
     }
 
+    function testFuzz_Revert_batchBurn_Active(address[2] calldata froms, uint256[2] calldata amounts) public {
+        // Cast between fixed size arrays and dynamic size array.
+        address[] memory froms_ = castArrayStaticToDynamic(froms);
+        uint256[] memory amounts_ = castArrayStaticToDynamic(amounts);
+
+        // Given: "RecoveryController" is active.
+        vm.prank(users.owner);
+        recoveryControllerExtension.activate();
+
+        // When: "owner" burns "amount" from "from".
+        // Then: Transaction should revert with "Active".
+        vm.prank(users.owner);
+        vm.expectRevert(Active.selector);
+        recoveryControllerExtension.batchBurn(froms_, amounts_);
+    }
+
+    function testFuzz_Revert_batchBurn_LengthMismatch(address[2] calldata froms, uint256[] calldata amounts) public {
+        // Cast between fixed size arrays and dynamic size array.
+        address[] memory froms_ = castArrayStaticToDynamic(froms);
+
+        // Given: "RecoveryController" is not active.
+
+        // And: Length of both input arrays is not equal (test-condition LengthMismatch).
+        vm.assume(froms.length != amounts.length);
+
+        // When: "owner" burns "amounts" from "froms".
+        // Then: Transaction should revert with "LengthMismatch".
+        vm.prank(users.owner);
+        vm.expectRevert(LengthMismatch.selector);
+        recoveryControllerExtension.batchBurn(froms_, amounts);
+    }
+
     function testFuzz_Pass_batchBurn_PositionPartiallyClosed(
-        UserState[2] calldata froms,
+        address[2] calldata froms,
+        uint256[2] calldata initialBalanceFroms,
         uint256[2] calldata amounts,
         uint256 controllerBalanceRT
     ) public {
-        UserState[] memory froms_ = castArrayStaticToDynamicUserState(froms);
+        address[] memory froms_ = castArrayStaticToDynamic(froms);
+        uint256[] memory initialBalanceFroms_ = castArrayStaticToDynamic(initialBalanceFroms);
         uint256[] memory amounts_ = castArrayStaticToDynamic(amounts);
-        vm.assume(uniqueUsers(froms_));
+        vm.assume(uniqueAddresses(froms_));
 
         // Cache variables.
         uint256 length = froms_.length;
         uint256 totalAmount;
         uint256 totalOpenPosition;
-        address[] memory fromAddrs = new address[](length);
 
-        // Given: Each "amounts[i]" is strictly smaller as "openPosition[i]" (test-condition PositionPartiallyClosed).
-        // -> Each userBalanceWRT is also at least 1.
+        // Given: Each "amounts[i]" is strictly smaller as "initialBalanceFroms[i]" (test-condition PositionPartiallyClosed).
+        // -> Each "initialBalanceFroms[i]" is also at least 1.
         for (uint256 i; i < length; ++i) {
-            fromAddrs[i] = froms_[i].addr;
-
-            froms_[i].balanceWRT = bound(froms_[i].balanceWRT, 1, type(uint256).max);
-            froms_[i].redeemed = bound(froms_[i].redeemed, 0, froms_[i].balanceWRT - 1); // Invariant.
-            uint256 openPosition = froms_[i].balanceWRT - froms_[i].redeemed;
-            amounts_[i] = bound(amounts_[i], 0, openPosition - 1);
+            initialBalanceFroms_[i] = bound(initialBalanceFroms_[i], 1, type(uint256).max);
+            amounts_[i] = bound(amounts_[i], 0, initialBalanceFroms_[i] - 1);
 
             // totalOpenPosition can't be higher as type(uint256).max.
-            vm.assume(froms_[i].balanceWRT <= type(uint256).max - totalOpenPosition);
-            totalOpenPosition += openPosition;
+            vm.assume(initialBalanceFroms_[i] <= type(uint256).max - totalOpenPosition);
+            totalOpenPosition += initialBalanceFroms_[i];
             totalAmount += amounts_[i];
         }
 
@@ -297,70 +324,62 @@ contract MintAndBurnLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
         controllerBalanceRT = bound(controllerBalanceRT, totalOpenPosition, type(uint256).max);
 
         // And: State is persisted.
-        for (uint256 i; i < length; ++i) {
-            setUserState(froms_[i]);
-        }
+        vm.prank(users.owner);
+        recoveryControllerExtension.batchMint(froms_, initialBalanceFroms_);
+
         deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
 
         // When: "owner" burns "amounts" from "froms".
         vm.prank(users.owner);
-        recoveryControllerExtension.batchBurn(fromAddrs, amounts_);
+        recoveryControllerExtension.batchBurn(froms_, amounts_);
 
         // Then: "wrappedRecoveryToken" balance of each "froms[i]" should decrease with "amounts[i]".
         for (uint256 i; i < froms_.length; ++i) {
-            assertEq(wrappedRecoveryToken.balanceOf(froms_[i].addr), froms_[i].balanceWRT - amounts_[i]);
+            assertEq(wrappedRecoveryToken.balanceOf(froms_[i]), initialBalanceFroms_[i] - amounts_[i]);
         }
         // And: "recoveryToken" balance of "recoveryController" should decrease with sum of all "amounts".
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - totalAmount);
     }
 
     function testFuzz_Pass_batchBurn_PositionFullyClosed(
-        UserState[2] calldata froms,
+        address[2] calldata froms,
+        uint256[2] calldata initialBalanceFroms,
         uint256[2] calldata amounts,
         uint256 controllerBalanceRT
     ) public {
-        UserState[] memory froms_ = castArrayStaticToDynamicUserState(froms);
+        address[] memory froms_ = castArrayStaticToDynamic(froms);
+        uint256[] memory initialBalanceFroms_ = castArrayStaticToDynamic(initialBalanceFroms);
         uint256[] memory amounts_ = castArrayStaticToDynamic(amounts);
-        vm.assume(uniqueUsers(froms_));
+        vm.assume(uniqueAddresses(froms_));
 
         // Cache variables.
         uint256 length = froms_.length;
         uint256 totalOpenPosition;
-        address[] memory fromAddrs = new address[](length);
 
-        // Given: Each "amounts[i]" is greater or equal as "openPosition[i]" (test-condition PositionPartiallyClosed).
-        // -> Each userBalanceWRT is also at least 1.
+        // Given: Each "amounts[i]" is greater or equal as "initialBalanceFroms[i]" (test-condition PositionPartiallyClosed).
         for (uint256 i; i < length; ++i) {
-            fromAddrs[i] = froms_[i].addr;
-
-            froms_[i].balanceWRT = bound(froms_[i].balanceWRT, 1, type(uint256).max);
-            froms_[i].redeemed = bound(froms_[i].redeemed, 0, froms_[i].balanceWRT - 1); // Invariant.
-            uint256 openPosition = froms_[i].balanceWRT - froms_[i].redeemed;
-            amounts_[i] = bound(amounts_[i], openPosition, type(uint256).max);
+            amounts_[i] = bound(amounts_[i], initialBalanceFroms_[i], type(uint256).max);
 
             // totalOpenPosition can't be higher as type(uint256).max.
-            vm.assume(froms_[i].balanceWRT <= type(uint256).max - totalOpenPosition);
-            totalOpenPosition += openPosition;
+            vm.assume(initialBalanceFroms_[i] <= type(uint256).max - totalOpenPosition);
+            totalOpenPosition += initialBalanceFroms_[i];
         }
 
         // And: Total "openPosition" is smaller or equal to "initialBalanceController" (Invariant!).
         controllerBalanceRT = bound(controllerBalanceRT, totalOpenPosition, type(uint256).max);
 
         // And: State is persisted.
-        for (uint256 i; i < length; ++i) {
-            setUserState(froms_[i]);
-        }
+        vm.prank(users.owner);
+        recoveryControllerExtension.batchMint(froms_, initialBalanceFroms_);
         deal(address(recoveryToken), address(recoveryControllerExtension), controllerBalanceRT);
 
         // When: "owner" burns "amounts" from "froms".
         vm.prank(users.owner);
-        recoveryControllerExtension.batchBurn(fromAddrs, amounts_);
+        recoveryControllerExtension.batchBurn(froms_, amounts_);
 
-        // Then: "wrappedRecoveryToken" balance of each "froms[i]" should decrease with "amounts[i]".
+        // Then: "wrappedRecoveryToken" balance of each "froms[i]" should be 0.
         for (uint256 i; i < froms_.length; ++i) {
-            assertEq(wrappedRecoveryToken.balanceOf(froms_[i].addr), 0);
-            assertEq(recoveryControllerExtension.redeemed(froms_[i].addr), 0);
-            assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(froms_[i].addr), 0);
+            assertEq(wrappedRecoveryToken.balanceOf(froms_[i]), 0);
         }
         // And: "recoveryToken" balance of "recoveryController" should decrease with sum of all "openPosition".
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - totalOpenPosition);
