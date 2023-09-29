@@ -44,15 +44,6 @@ contract ActiveRecoveryControllerHandler is RecoveryControllerHandler {
                                     FUNCTIONS
     //////////////////////////////////////////////////////////////////////////*/
 
-    function burn(uint256 actorIndexSeed, uint256 amount) external {
-        address from = state.getActor(actorIndexSeed);
-
-        amount = bound(amount, 0, recoveryController.balanceOf(from));
-
-        vm.prank(recoveryController.owner());
-        recoveryController.burn(from, amount);
-    }
-
     function depositUnderlying(uint256 amount) external {
         // Reverts when there are no open positions.
         if (wrappedRecoveryToken.totalSupply() == 0) return;

@@ -227,16 +227,12 @@ contract RecoveryController is ERC20, Owned {
      * @dev Burns an amount of Recovery Tokens, held by the controller,
      * equal to the burned unredeemed Wrapped Recovery Tokens.
      */
-    function burn(address from, uint256 amount) external onlyOwner {
-        uint256 openPosition = balanceOf[from] - redeemed[from];
+    function burn(address from, uint256 amount) external onlyOwner notActive {
+        uint256 openPosition = balanceOf[from];
 
         // Burn the Wrapped Recovery Tokens.
-        if (amount >= openPosition) {
-            _closePosition(from);
-            amount = openPosition;
-        } else {
-            _burn(from, amount);
-        }
+        if (amount >= openPosition) amount = openPosition;
+        _burn(from, amount);
 
         // Burn the corresponding Recovery Tokens held by the controller.
         recoveryToken.burn(amount);
@@ -249,7 +245,7 @@ contract RecoveryController is ERC20, Owned {
      * @dev Burns an amount of Recovery Tokens, held by the controller,
      * equal to the sum of all burned unredeemed Wrapped Recovery Tokens.
      */
-    function batchBurn(address[] calldata froms, uint256[] calldata amounts) external onlyOwner {
+    function batchBurn(address[] calldata froms, uint256[] calldata amounts) external onlyOwner notActive {
         uint256 length = froms.length;
 
         if (length != amounts.length) revert LengthMismatch();
@@ -260,16 +256,12 @@ contract RecoveryController is ERC20, Owned {
         uint256 totalAmount;
         for (uint256 i; i < length;) {
             from = froms[i];
-            openPosition = balanceOf[from] - redeemed[from];
+            openPosition = balanceOf[from];
             amount = amounts[i];
 
             // Burn the Wrapped Recovery Tokens.
-            if (amount >= openPosition) {
-                _closePosition(from);
-                amount = openPosition;
-            } else {
-                _burn(from, amount);
-            }
+            if (amount >= openPosition) amount = openPosition;
+            _burn(from, amount);
 
             unchecked {
                 ++i;
