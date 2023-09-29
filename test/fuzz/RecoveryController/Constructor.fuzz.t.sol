@@ -4,16 +4,16 @@
  */
 pragma solidity 0.8.19;
 
-import {RecoveryController_Fuzz_Test} from "../RecoveryController.fuzz.t.sol";
+import {RecoveryController_Fuzz_Test} from "./_RecoveryController.fuzz.t.sol";
 
 import {RecoveryControllerExtension} from "../../utils/Extensions.sol";
 
 /**
- * @notice Fuzz tests for the Deployment of "RecoveryController".
+ * @notice Fuzz tests for the "constructor" of "RecoveryController".
  */
-contract Deployment_Fuzz_Test is RecoveryController_Fuzz_Test {
+contract Constructor_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
-                              SETUP
+                                SETUP
     /////////////////////////////////////////////////////////////// */
 
     function setUp() public override {
@@ -21,10 +21,10 @@ contract Deployment_Fuzz_Test is RecoveryController_Fuzz_Test {
     }
 
     /* ///////////////////////////////////////////////////////////////
-                            DEPLOYMENT
+                                TESTS
     /////////////////////////////////////////////////////////////// */
 
-    function testFuzz_Pass_deployment(address owner_) public {
+    function testFuzz_Success_constructor(address owner_) public {
         // Given:
 
         // When "owner_" deploys "recoveryController_".
