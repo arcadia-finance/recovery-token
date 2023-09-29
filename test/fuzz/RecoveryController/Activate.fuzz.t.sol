@@ -4,23 +4,23 @@
  */
 pragma solidity 0.8.19;
 
-import {RecoveryController_Fuzz_Test} from "../RecoveryController.fuzz.t.sol";
+import {RecoveryController_Fuzz_Test} from "./_RecoveryController.fuzz.t.sol";
 
 /**
- * @notice Fuzz tests for the activation logic of "RecoveryController".
+ * @notice Fuzz tests for the function "activate" of "RecoveryController".
  */
-contract ActivationLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
+contract Activate_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
-                              SETUP
+                                SETUP
     /////////////////////////////////////////////////////////////// */
 
     function setUp() public override {
         RecoveryController_Fuzz_Test.setUp();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                        ACTIVATION LOGIC
-    //////////////////////////////////////////////////////////////*/
+    /* ///////////////////////////////////////////////////////////////
+                                TESTS
+    /////////////////////////////////////////////////////////////// */
 
     function testFuzz_Revert_activate_NonOwner(address unprivilegedAddress) public {
         // Given: Caller is not the "owner".

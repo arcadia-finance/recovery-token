@@ -4,35 +4,23 @@
  */
 pragma solidity 0.8.19;
 
-import {RecoveryController_Fuzz_Test} from "../RecoveryController.fuzz.t.sol";
+import {RecoveryController_Fuzz_Test} from "./_RecoveryController.fuzz.t.sol";
 
 /**
- * @notice Fuzz tests for the transfer logic of "RecoveryController".
+ * @notice Fuzz tests for the function "transferFrom" of "RecoveryController".
  */
-contract TransferLogic_Fuzz_Test is RecoveryController_Fuzz_Test {
+contract TransferFrom_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
-                              SETUP
+                                SETUP
     /////////////////////////////////////////////////////////////// */
 
     function setUp() public override {
         RecoveryController_Fuzz_Test.setUp();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            TRANSFER LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function testFuzz_Revert_transfer(address user, address to, uint256 initialBalance, uint256 amount) public {
-        // Given "user" has "initialBalance" tokens.
-        deal(address(recoveryControllerExtension), user, initialBalance);
-
-        // When: "user" transfers "amount" to "to".
-        // Then: Transaction should revert with "NoTransfersAllowed".
-        vm.prank(user);
-        vm.expectRevert(NoTransfersAllowed.selector);
-        recoveryControllerExtension.transfer(to, amount);
-    }
-
+    /* ///////////////////////////////////////////////////////////////
+                                TESTS
+    /////////////////////////////////////////////////////////////// */
     function testFuzz_Revert_transferFrom(
         address caller,
         address user,
