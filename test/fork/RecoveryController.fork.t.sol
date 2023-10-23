@@ -6,6 +6,8 @@ pragma solidity 0.8.19;
 
 import {Fork_Test} from "./Fork.t.sol";
 
+import {IUSDC} from "../utils/interfaces.sol";
+
 /**
  * @notice Fork tests for "RecoveryToken".
  */
@@ -30,7 +32,7 @@ contract RecoveryController_Fork_Test is Fork_Test {
                             FORK TESTS
     ///////////////////////////////////////////////////////////////*/
 
-    function testFork_Pass_deposit(TestVars memory vars) public {
+    function testFork_Success_deposit(TestVars memory vars) public {
         // Given: Users are unique.
         givenUniqueUsers(vars);
 
@@ -62,7 +64,7 @@ contract RecoveryController_Fork_Test is Fork_Test {
         assertEq(underlyingToken.balanceOf(address(recoveryController)), vars.depositAmountUT);
     }
 
-    function testFork_Pass_redeem_NonRecoveredPosition(TestVars memory vars) public {
+    function testFork_Success_redeem_NonRecoveredPosition(TestVars memory vars) public {
         // Given: users are unique.
         givenUniqueUsers(vars);
 
@@ -88,7 +90,7 @@ contract RecoveryController_Fork_Test is Fork_Test {
         assertApproxEqAbs(underlyingToken.balanceOf(address(recoveryController)), 0, maxRoundingError);
     }
 
-    function testFork_Pass_redeem_FullyRecoveredPosition(TestVars memory vars) public {
+    function testFork_Success_redeem_FullyRecoveredPosition(TestVars memory vars) public {
         // Given: users are unique.
         givenUniqueUsers(vars);
 
@@ -110,7 +112,7 @@ contract RecoveryController_Fork_Test is Fork_Test {
         emit Transfer(address(recoveryController), vars.primaryHolder, vars.balanceWRT);
         recoveryController.redeemUnderlying(vars.primaryHolder);
 
-        // Then: "depositAmountUT" of "underlyingToken" is transferred from "recoveryController" to "primaryHolder".
+        // Then: "depositAmountUT" of "underlyingToken" is transferred from "recoveryController" to "owner".
         assertEq(underlyingToken.balanceOf(vars.primaryHolder), initialBalancePrimaryHolder + vars.balanceWRT);
         assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
         assertEq(underlyingToken.balanceOf(users.owner), vars.depositAmountUT - vars.balanceWRT);
@@ -118,4 +120,32 @@ contract RecoveryController_Fork_Test is Fork_Test {
 
     // depositRecoveryTokens(uint256) and withdrawRecoveryTokens(uint256) call the same underlying function for
     // transfers of "underlyingToken" as redeemUnderlying(address), no need to fork test them separately.
+
+    function testFork_Success_redeem_BlacklistedOwner(TestVars memory vars) public {
+        // Given: users are unique.
+        givenUniqueUsers(vars);
+
+        // Cache initial balances.
+        uint256 initialBalancePrimaryHolder = underlyingToken.balanceOf(vars.primaryHolder);
+
+        // And: "primaryHolder" is blacklisted.
+        address blacklister = IUSDC(address(underlyingToken)).blacklister();
+        vm.prank(blacklister);
+        IUSDC(address(underlyingToken)).blacklist(vars.primaryHolder);
+
+        // And: The position is not fully redeemable.
+        vars = givenPositionIsNotFullyRedeemable(vars);
+
+        // And: State is persisted.
+        mintAndDeposit(vars);
+
+        // When: A "caller' redeems "primaryHolder".
+        recoveryController.redeemUnderlying(vars.primaryHolder);
+
+        // Then: "depositAmountUT" of "underlyingToken" is transferred from "recoveryController" to "owner".
+        assertEq(underlyingToken.balanceOf(vars.primaryHolder), initialBalancePrimaryHolder);
+        uint256 maxRoundingError = vars.balanceWRT / 1e18 + 1;
+        assertApproxEqAbs(underlyingToken.balanceOf(users.owner), vars.depositAmountUT, maxRoundingError);
+        assertApproxEqAbs(underlyingToken.balanceOf(address(recoveryController)), 0, maxRoundingError);
+    }
 }
