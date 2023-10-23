@@ -14,7 +14,7 @@ abstract contract Events {
 
     event ActivationSet(bool active);
 
-    event TerminationInitiated(uint32 timestamp);
+    event TerminationInitiated();
 
     /*//////////////////////////////////////////////////////////////
                             ERC20
