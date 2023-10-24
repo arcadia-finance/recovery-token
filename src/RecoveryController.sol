@@ -9,6 +9,7 @@ import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 
+import {IUSDC} from "./interfaces/IUSDC.sol";
 import {RecoveryToken} from "./RecoveryToken.sol";
 
 /**
@@ -466,7 +467,12 @@ contract RecoveryController is ERC20, Owned {
         recoveryToken.burn(amount);
         // Send equal amount of underlying assets.
         // Reentrancy: Transfer the Underlying Tokens after logic.
-        ERC20(underlying).safeTransfer(to, amount);
+        if (IUSDC(underlying).isBlacklisted(to)) {
+            // Very unrealistic flow, to be settled outside of this contract.
+            ERC20(underlying).safeTransfer(owner, amount);
+        } else {
+            ERC20(underlying).safeTransfer(to, amount);
+        }
     }
 
     /**

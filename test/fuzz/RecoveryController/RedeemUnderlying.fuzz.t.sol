@@ -6,6 +6,7 @@ pragma solidity 0.8.19;
 
 import {RecoveryController_Fuzz_Test} from "./_RecoveryController.fuzz.t.sol";
 
+import {USDCMock} from "../../mocks/USDCMock.sol";
 import {UserState, ControllerState} from "../../utils/Types.sol";
 
 /**
@@ -162,5 +163,46 @@ contract RedeemUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fuz
 
         // And: "underlyingToken" balance of "owner" is zero.
         assertEq(underlyingToken.balanceOf(users.owner), 0);
+    }
+
+    function testFuzz_Success_redeemUnderlying_BlacklistedOwner(
+        address caller,
+        UserState memory user,
+        ControllerState memory controller
+    ) public {
+        // Given: "user" is not the "recoveryController".
+        vm.assume(user.addr != address(recoveryControllerExtension));
+
+        // And: "user" is blacklisted on the USDC contract.
+        USDCMock(address(underlyingToken)).blacklist(user.addr);
+
+        // And: The protocol is active with a random valid state.
+        (user, controller) = givenValidActiveState(user, controller);
+
+        // And: The position is not fully covered (test-condition NonRecoveredPosition).
+        (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
+        vm.assume(openPosition > redeemable);
+
+        // And: State is persisted.
+        setUserState(user);
+        setControllerState(controller);
+
+        // When: "caller" calls "redeemUnderlying" for "user".
+        vm.prank(caller);
+        recoveryControllerExtension.redeemUnderlying(user.addr);
+
+        // Then: "user" state variables are updated, but user did not receive the funds.
+        assertEq(recoveryControllerExtension.redeemed(user.addr), user.redeemed + redeemable);
+        assertEq(
+            recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal
+        );
+        assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT);
+
+        // And: "controller" state variables are updated.
+        assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - redeemable);
+        assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - redeemable);
+
+        // And: "underlyingToken" balance of "owner" increases with the redeemable funds.
+        assertEq(underlyingToken.balanceOf(users.owner), redeemable);
     }
 }
