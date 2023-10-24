@@ -70,9 +70,8 @@ contract RecoveryController is ERC20, Owned {
 
     /**
      * @notice Emitted when the termination of the Controller is initiated.
-     * @param timestamp The timestamp when the termination of the contract is initiated.
      */
-    event TerminationInitiated(uint32 timestamp);
+    event TerminationInitiated();
 
     /*//////////////////////////////////////////////////////////////
                                ERRORS
@@ -505,7 +504,7 @@ contract RecoveryController is ERC20, Owned {
     function initiateTermination() external onlyOwner {
         terminationTimestamp = uint32(block.timestamp);
 
-        emit TerminationInitiated(uint32(block.timestamp));
+        emit TerminationInitiated();
     }
 
     /**

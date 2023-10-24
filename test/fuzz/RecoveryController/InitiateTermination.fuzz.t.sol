@@ -44,7 +44,7 @@ contract InitiateTermination_RecoveryController_Fuzz_Test is RecoveryController_
         // When: "owner" calls "initiateTermination".
         vm.prank(users.owner);
         vm.expectEmit(address(recoveryControllerExtension));
-        emit TerminationInitiated(currentTime);
+        emit TerminationInitiated();
         recoveryControllerExtension.initiateTermination();
 
         // Then: "terminationTimestamp" is set to "currentTime".
