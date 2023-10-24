@@ -6,7 +6,7 @@ pragma solidity 0.8.19;
 
 import {Fork_Test} from "./Fork.t.sol";
 
-import {IUSDC} from "../utils/interfaces.sol";
+import {IUSDC} from "../utils/Interfaces.sol";
 
 /**
  * @notice Fork tests for "RecoveryToken".
