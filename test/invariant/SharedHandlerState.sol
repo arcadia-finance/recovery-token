@@ -2,9 +2,9 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {StdUtils} from "../../lib/forge-std/src/StdUtils.sol";
+import { StdUtils } from "../../lib/forge-std/src/StdUtils.sol";
 
 /**
  * @notice Contract deployed for each invariant test to share state across different handlers.

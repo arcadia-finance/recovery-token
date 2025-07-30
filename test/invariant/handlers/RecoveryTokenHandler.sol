@@ -2,11 +2,10 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {BaseHandler, SharedHandlerState} from "./BaseHandler.sol";
-
-import {RecoveryToken} from "../../../src/RecoveryToken.sol";
+import { BaseHandler, SharedHandlerState } from "./BaseHandler.sol";
+import { RecoveryToken } from "../../../src/RecoveryToken.sol";
 
 /**
  * @notice Handler for "RecoveryToken".

@@ -2,9 +2,9 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {RecoveryToken_Fuzz_Test} from "./_RecoveryToken.fuzz.t.sol";
+import { RecoveryToken_Fuzz_Test } from "./_RecoveryToken.fuzz.t.sol";
 
 /**
  * @notice Fuzz tests for the function "mint" of "RecoveryToken".

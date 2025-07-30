@@ -2,11 +2,10 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {RecoveryController_Fuzz_Test} from "./_RecoveryController.fuzz.t.sol";
-
-import {RecoveryControllerExtension} from "../../utils/Extensions.sol";
+import { RecoveryController_Fuzz_Test } from "./_RecoveryController.fuzz.t.sol";
+import { RecoveryControllerExtension } from "../../utils/Extensions.sol";
 
 /**
  * @notice Fuzz tests for the "constructor" of "RecoveryController".

@@ -2,10 +2,10 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {RecoveryController} from "../../src/RecoveryController.sol";
-import {RecoveryToken} from "../../src/RecoveryToken.sol";
+import { RecoveryController } from "../../src/RecoveryController.sol";
+import { RecoveryToken } from "../../src/RecoveryToken.sol";
 
 /**
  * @notice Extension contracts allow access to internal functions and the creation of getters and setters for all variables.
@@ -13,7 +13,7 @@ import {RecoveryToken} from "../../src/RecoveryToken.sol";
  * As such the complete space of possible state configurations can be tested.
  */
 contract RecoveryControllerExtension is RecoveryController {
-    constructor(address underlying_) RecoveryController(underlying_) {}
+    constructor(address underlying_) RecoveryController(underlying_) { }
 
     function getUnderlying() public view returns (address underlying_) {
         underlying_ = address(underlying);
@@ -41,7 +41,7 @@ contract RecoveryControllerExtension is RecoveryController {
 }
 
 contract RecoveryTokenExtension is RecoveryToken {
-    constructor(address recoveryController_, uint8 decimals_) RecoveryToken(recoveryController_, decimals_) {}
+    constructor(address recoveryController_, uint8 decimals_) RecoveryToken(recoveryController_, decimals_) { }
 
     function getRecoveryController() public view returns (address recoveryController_) {
         recoveryController_ = recoveryController;

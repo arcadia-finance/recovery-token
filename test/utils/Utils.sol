@@ -2,9 +2,9 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {UserState} from "./Types.sol";
+import { UserState } from "./Types.sol";
 
 abstract contract Utils {
     mapping(address => bool) seen;

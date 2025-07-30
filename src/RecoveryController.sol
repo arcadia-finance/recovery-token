@@ -2,13 +2,13 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {ERC20} from "../lib/solmate/src/tokens/ERC20.sol";
-import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
-import {Owned} from "../lib/solmate/src/auth/Owned.sol";
-import {RecoveryToken} from "./RecoveryToken.sol";
-import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
+import { ERC20 } from "../lib/solmate/src/tokens/ERC20.sol";
+import { FixedPointMathLib } from "../lib/solmate/src/utils/FixedPointMathLib.sol";
+import { Owned } from "../lib/solmate/src/auth/Owned.sol";
+import { RecoveryToken } from "./RecoveryToken.sol";
+import { SafeTransferLib } from "../lib/solmate/src/utils/SafeTransferLib.sol";
 
 /**
  * @title Recovery Controller.

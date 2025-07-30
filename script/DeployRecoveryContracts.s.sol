@@ -2,12 +2,11 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {Script} from "../lib/forge-std/src/Script.sol";
-import {stdJson} from "../lib/forge-std/src/StdJson.sol";
-
-import {RecoveryController} from "../src/RecoveryController.sol";
+import { RecoveryController } from "../src/RecoveryController.sol";
+import { Script } from "../lib/forge-std/src/Script.sol";
+import { stdJson } from "../lib/forge-std/src/StdJson.sol";
 
 contract DeployRecoveryContracts is Script {
     using stdJson for string;
