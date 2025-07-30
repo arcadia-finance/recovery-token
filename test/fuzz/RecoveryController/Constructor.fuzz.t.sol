@@ -23,14 +23,15 @@ contract Constructor_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Tes
                                 TESTS
     /////////////////////////////////////////////////////////////// */
 
-    function testFuzz_Success_constructor(address owner_) public {
+    function testFuzz_Success_constructor(address caller, address owner_) public {
         // Given:
 
         // When "owner_" deploys "recoveryController_".
-        vm.prank(owner_);
+        vm.prank(caller);
         vm.expectEmit();
         emit ActivationSet(false);
-        RecoveryControllerExtension recoveryController_ = new RecoveryControllerExtension(address(underlyingToken));
+        RecoveryControllerExtension recoveryController_ =
+            new RecoveryControllerExtension(owner_, address(underlyingToken));
 
         // Then: the immutable variables are set on "recoveryController_".
         assertEq(recoveryController_.owner(), owner_);

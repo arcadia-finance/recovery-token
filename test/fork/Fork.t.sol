@@ -19,7 +19,7 @@ abstract contract Fork_Test is Base_Test {
     ///////////////////////////////////////////////////////////////*/
 
     address internal constant USDC_ADDRESS = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
-    address internal constant USDC_ADMIN = 0x4fc7850364958d97B4d3f5A08f79db2493f8cA44; // Optimism
+    address internal constant USDC_ADMIN = 0x4fc7850364958d97B4d3f5A08f79db2493f8cA44;
     address internal constant USDC_WHALE = 0x0B0A5886664376F59C351ba3f598C8A8B4D0A6f3;
     string internal RPC_URL = vm.envString("RPC_URL");
 

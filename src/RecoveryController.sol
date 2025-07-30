@@ -127,11 +127,12 @@ contract RecoveryController is ERC20, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
+     * @param owner_ The address of the Owner.
      * @param underlying_ The contract address of the Underlying Token.
      */
-    constructor(address underlying_)
+    constructor(address owner_, address underlying_)
         ERC20("Wrapped Arcadia Recovery Tokens", "wART", ERC20(underlying_).decimals())
-        Owned(msg.sender)
+        Owned(owner_)
     {
         underlying = underlying_;
         recoveryToken = new RecoveryToken(address(this), decimals);

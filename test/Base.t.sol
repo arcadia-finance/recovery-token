@@ -73,7 +73,7 @@ abstract contract Base_Test is Test, Errors, Events, Utils {
     function deployRecoveryContracts() internal {
         // Deploy Recovery contracts.
         vm.prank(users.creator);
-        recoveryController = new RecoveryController(address(underlyingToken));
+        recoveryController = new RecoveryController(users.creator, address(underlyingToken));
         wrappedRecoveryToken = ERC20(address(recoveryController));
         recoveryToken = RecoveryToken(recoveryController.recoveryToken());
 

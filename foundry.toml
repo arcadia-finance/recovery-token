@@ -2,7 +2,7 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-fs_permissions = [{ access = "read", path = "./script"}]
+fs_permissions = [{ access = "read", path = "./script"}, { access = "write", path = "./script/out"}]
 
 [invariant]
 fail_on_revert = true
