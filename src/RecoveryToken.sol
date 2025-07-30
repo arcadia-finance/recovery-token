@@ -5,7 +5,6 @@
 pragma solidity 0.8.19;
 
 import {ERC20} from "../lib/solmate/src/tokens/ERC20.sol";
-
 import {IRecoveryToken} from "./interfaces/IRecoveryToken.sol";
 
 /**
