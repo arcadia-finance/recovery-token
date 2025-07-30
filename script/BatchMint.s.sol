@@ -4,9 +4,9 @@
  */
 pragma solidity 0.8.30;
 
-import { Arcadia, Safes } from "./utils/Constants.sol";
 import { Base_Script } from "./Base.s.sol";
 import { RecoveryController } from "../src/RecoveryController.sol";
+import { Safes } from "./utils/Constants.sol";
 import { stdJson } from "../lib/forge-std/src/StdJson.sol";
 
 contract BatchMint is Base_Script {
@@ -18,7 +18,7 @@ contract BatchMint is Base_Script {
         (uint256[] memory amounts, address[] memory tos) = getMintData();
 
         // Mint Recovery Tokens.
-        addToBatch(SAFE, Arcadia.RECOVERY_CONTROLLER, abi.encodeCall(recoveryController.batchMint, (tos, amounts)));
+        addToBatch(SAFE, address(recoveryController), abi.encodeCall(recoveryController.batchMint, (tos, amounts)));
 
         // Create and write away batched transaction data to be signed with Safe.
         bytes memory data = createBatchedData(SAFE);
