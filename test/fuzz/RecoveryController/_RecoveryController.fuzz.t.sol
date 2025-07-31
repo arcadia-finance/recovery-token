@@ -37,7 +37,7 @@ abstract contract RecoveryController_Fuzz_Test is Fuzz_Test {
         // Deploy Recovery contracts.
         vm.prank(users.creator);
         recoveryControllerExtension = new RecoveryControllerExtension(address(underlyingToken));
-        recoveryToken = RecoveryToken(recoveryControllerExtension.recoveryToken());
+        recoveryToken = RecoveryToken(recoveryControllerExtension.RECOVERY_TOKEN());
         wrappedRecoveryToken = ERC20(address(recoveryControllerExtension));
 
         // Label the contracts.

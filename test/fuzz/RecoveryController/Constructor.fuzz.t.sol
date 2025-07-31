@@ -34,7 +34,7 @@ contract Constructor_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Tes
 
         // Then: the immutable variables are set on "recoveryController_".
         assertEq(recoveryController_.owner(), owner_);
-        assertEq(recoveryController_.getUnderlying(), address(underlyingToken));
+        assertEq(address(recoveryController_.UNDERLYING_TOKEN()), address(underlyingToken));
         assertEq(recoveryController_.decimals(), underlyingToken.decimals());
     }
 }

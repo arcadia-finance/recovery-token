@@ -75,7 +75,7 @@ abstract contract Base_Test is Test, Errors, Events, Utils {
         vm.prank(users.creator);
         recoveryController = new RecoveryController(address(underlyingToken));
         wrappedRecoveryToken = ERC20(address(recoveryController));
-        recoveryToken = RecoveryToken(recoveryController.recoveryToken());
+        recoveryToken = RecoveryToken(recoveryController.RECOVERY_TOKEN());
 
         // Label the contracts.
         vm.label({ account: address(recoveryToken), newLabel: "RecoveryToken" });

@@ -15,10 +15,6 @@ import { RecoveryToken } from "../../src/RecoveryToken.sol";
 contract RecoveryControllerExtension is RecoveryController {
     constructor(address underlying_) RecoveryController(underlying_) { }
 
-    function getUnderlying() public view returns (address underlying_) {
-        underlying_ = address(underlying);
-    }
-
     function setTerminationTimestamp(uint32 terminationTimestamp_) public {
         terminationTimestamp = terminationTimestamp_;
     }
