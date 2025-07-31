@@ -5,7 +5,6 @@
 pragma solidity 0.8.30;
 
 import { Base_Script } from "./Base.s.sol";
-import { RecoveryController } from "../src/RecoveryController.sol";
 import { Safes } from "./utils/Constants.sol";
 import { stdJson } from "../lib/forge-std/src/StdJson.sol";
 
