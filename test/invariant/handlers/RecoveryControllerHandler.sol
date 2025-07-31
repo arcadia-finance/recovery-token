@@ -20,7 +20,7 @@ abstract contract RecoveryControllerHandler is BaseHandler {
     ERC20 internal underlyingToken;
     RecoveryToken internal recoveryToken;
     RecoveryController internal recoveryController;
-    ERC20 internal wrappedRecoveryToken;
+    ERC20 internal stakedRecoveryToken;
 
     /*//////////////////////////////////////////////////////////////////////////
                                 GHOST VARIABLES
@@ -43,7 +43,7 @@ abstract contract RecoveryControllerHandler is BaseHandler {
         underlyingToken = underlyingToken_;
         recoveryToken = recoveryToken_;
         recoveryController = recoveryController_;
-        wrappedRecoveryToken = ERC20(address(recoveryController));
+        stakedRecoveryToken = ERC20(address(recoveryController));
     }
 
     /*//////////////////////////////////////////////////////////////////////////

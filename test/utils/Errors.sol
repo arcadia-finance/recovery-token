@@ -28,9 +28,7 @@ abstract contract Errors {
 
     error LengthMismatch();
 
-    error DepositAmountZero();
-
-    error WithdrawAmountZero();
+    error ZeroAmount();
 
     error TerminationCoolDownPeriodNotPassed();
 }

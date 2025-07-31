@@ -44,7 +44,7 @@ abstract contract Invariant_Test is Base_Test {
                                      INVARIANTS
     //////////////////////////////////////////////////////////////////////////*/
 
-    function invariant_WrtSupplyEqRtBalanceControllerAndRedeemedAmount() external {
+    function invariant_SrtSupplyEqRtBalanceControllerAndRedeemedAmount() external {
         uint256 actorsLength = state.getActorsLength();
         uint256 totalRedeemed;
         for (uint256 i = 0; i < actorsLength; ++i) {
@@ -54,20 +54,20 @@ abstract contract Invariant_Test is Base_Test {
         assertEq(
             recoveryController.totalSupply(),
             recoveryToken.balanceOf(address(recoveryController)) + totalRedeemed,
-            unicode"Invariant violation: WRT_supply != RT_balance_controller + Σi(redeemed_i)"
+            unicode"Invariant violation: SRT_supply != RT_balance_controller + Σi(redeemed_i)"
         );
     }
 
-    function invariant_WrtBalanceGtRedeemed() external {
+    function invariant_SrtBalanceGtRedeemed() external {
         uint256 actorsLength = state.getActorsLength();
         for (uint256 i = 0; i < actorsLength; ++i) {
             address actor = state.actors(i);
-            uint256 wrtBalance = wrappedRecoveryToken.balanceOf(actor);
-            if (wrtBalance > 0) {
+            uint256 srtBalance = stakedRecoveryToken.balanceOf(actor);
+            if (srtBalance > 0) {
                 assertGt(
-                    wrtBalance,
+                    srtBalance,
                     recoveryController.redeemed(actor),
-                    unicode"Invariant violation: ∃i: WRT_balance_i > 0 ∧ WRT_balance_i <= redeemed_i"
+                    unicode"Invariant violation: ∃i: SRT_balance_i > 0 ∧ SRT_balance_i <= redeemed_i"
                 );
             }
         }

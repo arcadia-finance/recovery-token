@@ -84,7 +84,7 @@ contract RedeemUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fuz
         vm.assume(openPosition <= redeemable);
 
         // And: "totalSupply" equals the balance of the user (test-condition LastPosition).
-        controller.supplyWRT = user.balanceWRT;
+        controller.supplySRT = user.balanceSRT;
 
         // And: Assume "surplus" does not overflow (unrealistic big numbers).
         vm.assume(redeemable <= type(uint256).max - user.redeemed);
@@ -98,7 +98,7 @@ contract RedeemUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fuz
         recoveryControllerExtension.redeemUnderlying(user.addr);
 
         // Then: "user" position is closed.
-        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(stakedRecoveryToken.balanceOf(user.addr), 0);
         assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
         assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
@@ -128,15 +128,15 @@ contract RedeemUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fuz
         vm.assume(openPosition <= redeemable);
 
         // And: "totalSupply" is strictly bigger as the balance of the user (test-condition NotLastPosition).
-        vm.assume(user.balanceWRT < type(uint256).max);
-        controller.supplyWRT = bound(controller.supplyWRT, user.balanceWRT + 1, type(uint256).max);
+        vm.assume(user.balanceSRT < type(uint256).max);
+        controller.supplySRT = bound(controller.supplySRT, user.balanceSRT + 1, type(uint256).max);
 
         // And: Assume "surplus" does not overflow (unrealistic big numbers).
         vm.assume(redeemable <= type(uint256).max - user.redeemed);
-        uint256 surplus = user.redeemed + redeemable - user.balanceWRT;
+        uint256 surplus = user.redeemed + redeemable - user.balanceSRT;
         // And: Assume "delta" does not overflow (unrealistic big numbers).
         vm.assume(surplus <= type(uint256).max / 1e18);
-        uint256 delta = surplus * 1e18 / (controller.supplyWRT - user.balanceWRT);
+        uint256 delta = surplus * 1e18 / (controller.supplySRT - user.balanceSRT);
         // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
         vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
 
@@ -149,7 +149,7 @@ contract RedeemUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fuz
         recoveryControllerExtension.redeemUnderlying(user.addr);
 
         // Then: "user" position is closed.
-        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(stakedRecoveryToken.balanceOf(user.addr), 0);
         assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
         assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         // And: "user" token balances are updated.

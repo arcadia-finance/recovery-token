@@ -30,7 +30,7 @@ abstract contract Base_Test is Test, Errors, Events, Utils {
     ERC20 internal underlyingToken;
     RecoveryToken internal recoveryToken;
     RecoveryController internal recoveryController;
-    ERC20 internal wrappedRecoveryToken;
+    ERC20 internal stakedRecoveryToken;
 
     /*//////////////////////////////////////////////////////////////////////////
                                   SET-UP FUNCTION
@@ -42,8 +42,8 @@ abstract contract Base_Test is Test, Errors, Events, Utils {
             creator: createUser("creator"),
             owner: users.creator,
             tokenCreator: createUser("tokenCreator"),
-            holderWRT0: createUser("holderWRT0"),
-            holderWRT1: createUser("holderWRT1"),
+            holderSRT0: createUser("holderSRT0"),
+            holderSRT1: createUser("holderSRT1"),
             alice: createUser("alice"),
             bob: createUser("bob"),
             treasury: createUser("treasury")
@@ -75,7 +75,7 @@ abstract contract Base_Test is Test, Errors, Events, Utils {
         // Deploy Recovery contracts.
         vm.prank(users.creator);
         recoveryController = new RecoveryController(users.creator, address(underlyingToken));
-        wrappedRecoveryToken = ERC20(address(recoveryController));
+        stakedRecoveryToken = ERC20(address(recoveryController));
         recoveryToken = RecoveryToken(recoveryController.RECOVERY_TOKEN());
 
         // Label the contracts.

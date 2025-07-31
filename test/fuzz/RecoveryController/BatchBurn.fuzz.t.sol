@@ -114,9 +114,9 @@ contract BatchBurn_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test 
         vm.prank(users.owner);
         recoveryControllerExtension.batchBurn(froms_, amounts_);
 
-        // Then: "wrappedRecoveryToken" balance of each "froms[i]" should decrease with "amounts[i]".
+        // Then: "stakedRecoveryToken" balance of each "froms[i]" should decrease with "amounts[i]".
         for (uint256 i; i < froms_.length; ++i) {
-            assertEq(wrappedRecoveryToken.balanceOf(froms_[i]), initialBalanceFroms_[i] - amounts_[i]);
+            assertEq(stakedRecoveryToken.balanceOf(froms_[i]), initialBalanceFroms_[i] - amounts_[i]);
         }
         // And: "recoveryToken" balance of "recoveryController" should decrease with sum of all "amounts".
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - totalAmount);
@@ -158,9 +158,9 @@ contract BatchBurn_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test 
         vm.prank(users.owner);
         recoveryControllerExtension.batchBurn(froms_, amounts_);
 
-        // Then: "wrappedRecoveryToken" balance of each "froms[i]" should be 0.
+        // Then: "stakedRecoveryToken" balance of each "froms[i]" should be 0.
         for (uint256 i; i < froms_.length; ++i) {
-            assertEq(wrappedRecoveryToken.balanceOf(froms_[i]), 0);
+            assertEq(stakedRecoveryToken.balanceOf(froms_[i]), 0);
         }
         // And: "recoveryToken" balance of "recoveryController" should decrease with sum of all "openPosition".
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - totalOpenPosition);

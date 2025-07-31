@@ -16,7 +16,7 @@ contract ActiveState_Invariant_Test is Invariant_Test {
                                      VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
 
-    uint256 internal initialSupplyWRT;
+    uint256 internal initialSupplySRT;
     uint256 internal lastSupplyRT;
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -55,15 +55,15 @@ contract ActiveState_Invariant_Test is Invariant_Test {
 
         // Mint the initial positions to users.
         vm.startPrank(users.creator);
-        mintWrappedRecoveryTokens(users.holderWRT0, 1e10);
-        mintWrappedRecoveryTokens(users.holderWRT1, 1e10);
+        mintWrappedRecoveryTokens(users.holderSRT0, 1e10);
+        mintWrappedRecoveryTokens(users.holderSRT1, 1e10);
 
         // Set Recovery Contracts on active.
         recoveryController.activate();
         vm.stopPrank();
 
         lastSupplyRT = recoveryToken.totalSupply();
-        initialSupplyWRT = wrappedRecoveryToken.totalSupply();
+        initialSupplySRT = stakedRecoveryToken.totalSupply();
     }
 
     function mintWrappedRecoveryTokens(address to, uint256 amount) internal {
@@ -76,15 +76,15 @@ contract ActiveState_Invariant_Test is Invariant_Test {
     //////////////////////////////////////////////////////////////////////////*/
 
     function invariant_RtLastSupplyGeRtSupply() external {
-        assertGe(lastSupplyRT, recoveryToken.totalSupply(), unicode"Invariant violation: WRT_supply_last < WRT_supply");
+        assertGe(lastSupplyRT, recoveryToken.totalSupply(), unicode"Invariant violation: SRT_supply_last < SRT_supply");
         lastSupplyRT = recoveryToken.totalSupply();
     }
 
-    function invariant_WrtInitialSupplyGeWrtSupply() external {
+    function invariant_SrtInitialSupplyGeSrtSupply() external {
         assertGe(
-            initialSupplyWRT,
-            wrappedRecoveryToken.totalSupply(),
-            unicode"Invariant violation: WRT_supply_initial < WRT_supply"
+            initialSupplySRT,
+            stakedRecoveryToken.totalSupply(),
+            unicode"Invariant violation: SRT_supply_initial < SRT_supply"
         );
     }
 }

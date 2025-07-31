@@ -8,8 +8,8 @@ struct Users {
     address payable tokenCreator;
     address payable creator;
     address payable owner;
-    address payable holderWRT0;
-    address payable holderWRT1;
+    address payable holderSRT0;
+    address payable holderSRT1;
     address payable alice;
     address payable bob;
     address payable treasury;
@@ -19,7 +19,7 @@ struct UserState {
     address addr;
     uint256 redeemed;
     uint256 redeemablePerRTokenLast;
-    uint256 balanceWRT;
+    uint256 balanceSRT;
     uint256 balanceRT;
     uint256 balanceUT;
 }
@@ -27,7 +27,7 @@ struct UserState {
 struct ControllerState {
     bool active;
     uint256 redeemablePerRTokenGlobal;
-    uint256 supplyWRT;
+    uint256 supplySRT;
     uint256 balanceRT;
     uint256 balanceUT;
 }

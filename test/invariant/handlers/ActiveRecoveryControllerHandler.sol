@@ -44,7 +44,7 @@ contract ActiveRecoveryControllerHandler is RecoveryControllerHandler {
 
     function depositUnderlying(uint256 amount) external {
         // Reverts when there are no open positions.
-        if (wrappedRecoveryToken.totalSupply() == 0) return;
+        if (stakedRecoveryToken.totalSupply() == 0) return;
 
         amount = bound(amount, 1, 1e9);
         deal(address(underlyingToken), msg.sender, amount, true);
@@ -62,7 +62,7 @@ contract ActiveRecoveryControllerHandler is RecoveryControllerHandler {
         recoveryController.redeemUnderlying(actor);
     }
 
-    function depositRecoveryTokens(uint256 actorIndexSeed, uint256 amount) external {
+    function stakeRecoveryTokens(uint256 actorIndexSeed, uint256 amount) external {
         address actor = state.getActor(actorIndexSeed);
         uint256 balanceRT = recoveryToken.balanceOf(actor);
         if (balanceRT == 0) return;
@@ -71,18 +71,18 @@ contract ActiveRecoveryControllerHandler is RecoveryControllerHandler {
 
         vm.startPrank(actor);
         recoveryToken.approve(address(recoveryController), amount);
-        recoveryController.depositRecoveryTokens(amount);
+        recoveryController.stakeRecoveryTokens(amount);
         vm.stopPrank();
     }
 
-    function withdrawRecoveryTokens(uint256 actorIndexSeed, uint256 amount) external {
+    function unstakeRecoveryTokens(uint256 actorIndexSeed, uint256 amount) external {
         address actor = state.getActor(actorIndexSeed);
-        uint256 balanceWRT = wrappedRecoveryToken.balanceOf(actor);
-        if (balanceWRT == 0) return;
+        uint256 balanceSRT = stakedRecoveryToken.balanceOf(actor);
+        if (balanceSRT == 0) return;
 
         amount = bound(amount, 1, 1e10);
 
         vm.prank(actor);
-        recoveryController.withdrawRecoveryTokens(amount);
+        recoveryController.unstakeRecoveryTokens(amount);
     }
 }

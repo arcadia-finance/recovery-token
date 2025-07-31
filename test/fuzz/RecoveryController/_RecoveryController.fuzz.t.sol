@@ -38,7 +38,7 @@ abstract contract RecoveryController_Fuzz_Test is Fuzz_Test {
         vm.prank(users.creator);
         recoveryControllerExtension = new RecoveryControllerExtension(users.creator, address(underlyingToken));
         recoveryToken = RecoveryToken(recoveryControllerExtension.RECOVERY_TOKEN());
-        wrappedRecoveryToken = ERC20(address(recoveryControllerExtension));
+        stakedRecoveryToken = ERC20(address(recoveryControllerExtension));
 
         // Label the contracts.
         vm.label({ account: address(recoveryToken), newLabel: "RecoveryToken" });
@@ -56,12 +56,12 @@ abstract contract RecoveryController_Fuzz_Test is Fuzz_Test {
         UserState memory user,
         ControllerState memory controller
     ) public view returns (uint256) {
-        // And: "amount" is smaller or equal as "user.balanceRT" (underflow, see testFuzz_Revert_depositRecoveryTokens_InsufficientBalance).
+        // And: "amount" is smaller or equal as "user.balanceRT" (underflow, see testFuzz_Revert_stakeRecoveryTokens_InsufficientBalance).
         vm.assume(user.balanceRT >= minAmount);
         amount = bound(amount, minAmount, user.balanceRT);
         // And: "amount" does not overflow "totalSupply" (unrealistic big values).
-        vm.assume(controller.supplyWRT <= type(uint256).max - minAmount);
-        amount = bound(amount, minAmount, type(uint256).max - controller.supplyWRT);
+        vm.assume(controller.supplySRT <= type(uint256).max - minAmount);
+        amount = bound(amount, minAmount, type(uint256).max - controller.supplySRT);
         // And: "amount" does not overflow "controller.balanceRT" (unrealistic big values).
         vm.assume(controller.balanceRT <= type(uint256).max - minAmount);
         amount = bound(amount, minAmount, type(uint256).max - controller.balanceRT);
@@ -83,14 +83,14 @@ abstract contract RecoveryController_Fuzz_Test is Fuzz_Test {
         user.redeemablePerRTokenLast = bound(user.redeemablePerRTokenLast, 0, controller.redeemablePerRTokenGlobal);
         // Overflow: "redeemable" does not overflow (unrealistic big variables).
         if (user.redeemablePerRTokenLast != controller.redeemablePerRTokenGlobal) {
-            user.balanceWRT = bound(
-                user.balanceWRT,
+            user.balanceSRT = bound(
+                user.balanceSRT,
                 0,
                 type(uint256).max / (controller.redeemablePerRTokenGlobal - user.redeemablePerRTokenLast)
             );
         }
-        // Invariant: "redeemed" is smaller or equal as "userBalanceWRT".
-        user.redeemed = bound(user.redeemed, 0, user.balanceWRT);
+        // Invariant: "redeemed" is smaller or equal as "userBalanceSRT".
+        user.redeemed = bound(user.redeemed, 0, user.balanceSRT);
 
         (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
 
@@ -104,12 +104,12 @@ abstract contract RecoveryController_Fuzz_Test is Fuzz_Test {
         // Invariant: "underlyingToken" balance of the "controller" is greater or equal as "redeemable" of any user.
         controller.balanceUT = bound(controller.balanceUT, redeemable, type(uint256).max);
 
-        // Invariant ERC20: no "wrappedRecoveryToken" balance can exceed its totalSupply.
-        controller.supplyWRT = bound(controller.supplyWRT, user.balanceWRT, type(uint256).max);
+        // Invariant ERC20: no "stakedRecoveryToken" balance can exceed its totalSupply.
+        controller.supplySRT = bound(controller.supplySRT, user.balanceSRT, type(uint256).max);
 
-        // Invariant: Sum of the balances of "wrappedRecoveryToken" and "recoveryToken" for a single user,
-        // can never exceed initial totalSupply "wrappedRecoveryToken" -> Sum can never exceed type(uint256).max.
-        user.balanceRT = bound(user.balanceRT, 0, type(uint256).max - user.balanceWRT);
+        // Invariant: Sum of the balances of "stakedRecoveryToken" and "recoveryToken" for a single user,
+        // can never exceed initial totalSupply "stakedRecoveryToken" -> Sum can never exceed type(uint256).max.
+        user.balanceRT = bound(user.balanceRT, 0, type(uint256).max - user.balanceSRT);
 
         return (user, controller);
     }
@@ -123,7 +123,7 @@ abstract contract RecoveryController_Fuzz_Test is Fuzz_Test {
         recoveryControllerExtension.setRedeemablePerRTokenLast(user.addr, user.redeemablePerRTokenLast);
 
         // Set token balances.
-        deal(address(wrappedRecoveryToken), user.addr, user.balanceWRT);
+        deal(address(stakedRecoveryToken), user.addr, user.balanceSRT);
         deal(address(recoveryToken), user.addr, user.balanceRT);
         deal(address(underlyingToken), user.addr, user.balanceUT);
     }
@@ -137,9 +137,9 @@ abstract contract RecoveryController_Fuzz_Test is Fuzz_Test {
             recoveryControllerExtension.redeemablePerRTokenGlobal.selector
         ).checked_write(controller.redeemablePerRTokenGlobal);
 
-        // Set "totalSupply" of "wrappedRecoveryToken"
-        stdstore.target(address(wrappedRecoveryToken)).sig(wrappedRecoveryToken.totalSupply.selector).checked_write(
-            controller.supplyWRT
+        // Set "totalSupply" of "stakedRecoveryToken"
+        stdstore.target(address(stakedRecoveryToken)).sig(stakedRecoveryToken.totalSupply.selector).checked_write(
+            controller.supplySRT
         );
 
         // Set token balances.
@@ -152,7 +152,7 @@ abstract contract RecoveryController_Fuzz_Test is Fuzz_Test {
         pure
         returns (uint256 redeemable, uint256 openPosition)
     {
-        redeemable = user.balanceWRT * (controller.redeemablePerRTokenGlobal - user.redeemablePerRTokenLast) / 1e18;
-        openPosition = user.balanceWRT - user.redeemed;
+        redeemable = user.balanceSRT * (controller.redeemablePerRTokenGlobal - user.redeemablePerRTokenLast) / 1e18;
+        openPosition = user.balanceSRT - user.redeemed;
     }
 }

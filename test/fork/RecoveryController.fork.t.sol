@@ -37,15 +37,15 @@ contract RecoveryController_Fork_Test is Fork_Test {
         // Cache initial balances.
         uint256 initialBalanceDepositor = underlyingToken.balanceOf(vars.depositor);
 
-        // And: "primaryHolder" has a valid "wrappedRecoveryToken" balance.
-        vars = givenValidBalanceWRT(vars);
+        // And: "primaryHolder" has a valid "stakedRecoveryToken" balance.
+        vars = givenValidBalanceSRT(vars);
 
         // And: "depositor" has a valid "underlyingToken" balance of "depositAmountUT":
         vars = givenValidDepositAmountUT(vars);
 
         // And: State is persisted.
         vm.prank(users.owner);
-        recoveryController.mint(vars.primaryHolder, vars.balanceWRT);
+        recoveryController.mint(vars.primaryHolder, vars.balanceSRT);
         vm.prank(USDC_WHALE);
         underlyingToken.transfer(vars.depositor, vars.depositAmountUT);
 
@@ -83,7 +83,7 @@ contract RecoveryController_Fork_Test is Fork_Test {
         recoveryController.redeemUnderlying(vars.primaryHolder);
 
         // Then: "depositAmountUT" of "underlyingToken" is transferred from "recoveryController" to "primaryHolder".
-        uint256 maxRoundingError = vars.balanceWRT / 1e18 + 1;
+        uint256 maxRoundingError = vars.balanceSRT / 1e18 + 1;
         assertApproxEqAbs(
             underlyingToken.balanceOf(vars.primaryHolder),
             initialBalancePrimaryHolder + vars.depositAmountUT,
@@ -106,20 +106,20 @@ contract RecoveryController_Fork_Test is Fork_Test {
         mintAndDeposit(vars);
 
         // When: A "caller' redeems for "primaryHolder".
-        if (vars.depositAmountUT != vars.balanceWRT) {
+        if (vars.depositAmountUT != vars.balanceSRT) {
             vm.expectEmit(address(underlyingToken));
-            emit Transfer(address(recoveryController), users.owner, vars.depositAmountUT - vars.balanceWRT);
+            emit Transfer(address(recoveryController), users.owner, vars.depositAmountUT - vars.balanceSRT);
         }
         vm.expectEmit(address(underlyingToken));
-        emit Transfer(address(recoveryController), vars.primaryHolder, vars.balanceWRT);
+        emit Transfer(address(recoveryController), vars.primaryHolder, vars.balanceSRT);
         recoveryController.redeemUnderlying(vars.primaryHolder);
 
         // Then: "depositAmountUT" of "underlyingToken" is transferred from "recoveryController" to "owner".
-        assertEq(underlyingToken.balanceOf(vars.primaryHolder), initialBalancePrimaryHolder + vars.balanceWRT);
+        assertEq(underlyingToken.balanceOf(vars.primaryHolder), initialBalancePrimaryHolder + vars.balanceSRT);
         assertEq(underlyingToken.balanceOf(address(recoveryController)), 0);
-        assertEq(underlyingToken.balanceOf(users.owner), vars.depositAmountUT - vars.balanceWRT);
+        assertEq(underlyingToken.balanceOf(users.owner), vars.depositAmountUT - vars.balanceSRT);
     }
 
-    // depositRecoveryTokens(uint256) and withdrawRecoveryTokens(uint256) call the same underlying function for
+    // stakeRecoveryTokens(uint256) and unstakeRecoveryTokens(uint256) call the same underlying function for
     // transfers of "underlyingToken" as redeemUnderlying(address), no need to fork test them separately.
 }
