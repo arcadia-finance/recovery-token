@@ -7,7 +7,7 @@ pragma solidity 0.8.30;
 import { ControllerState, UserState } from "../../utils/Types.sol";
 import { ERC20 } from "../../../lib/solmate/src/tokens/ERC20.sol";
 import { Fuzz_Test } from "../Fuzz.t.sol";
-import { RecoveryControllerExtension } from "../../utils/Extensions.sol";
+import { RecoveryControllerExtension } from "../../utils/extensions/RecoveryControllerExtension.sol";
 import { RecoveryToken } from "../../../src/RecoveryToken.sol";
 import { StdStorage, stdStorage } from "../../../lib/forge-std/src/Test.sol";
 

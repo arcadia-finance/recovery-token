@@ -12,6 +12,7 @@ struct Users {
     address payable holderWRT1;
     address payable alice;
     address payable bob;
+    address payable treasury;
 }
 
 struct UserState {
