@@ -169,7 +169,21 @@ contract RecoveryController is ERC20, Owned {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            MINT/BURN LOGIC
+                    MINT LOGIC RECOVERY TOKENS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Mints (unstaked) Recovery Tokens.
+     * @param to The address that receives the minted tokens.
+     * @param amount The amount of tokens minted.
+     * @dev Owner can mint (unstaked) Recovery Tokens both before and after the "RecoveryController" is activated.
+     */
+    function mintRecoveryTokens(address to, uint256 amount) external onlyOwner {
+        RECOVERY_TOKEN.mint(to, amount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                MINT/BURN LOGIC STAKED RECOVERY TOKENS
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -181,7 +195,7 @@ contract RecoveryController is ERC20, Owned {
      */
     function mint(address to, uint256 amount) external onlyOwner notActive {
         _mint(to, amount);
-        RECOVERY_TOKEN.mint(amount);
+        RECOVERY_TOKEN.mint(address(this), amount);
     }
 
     /**
@@ -208,7 +222,7 @@ contract RecoveryController is ERC20, Owned {
             }
         }
 
-        RECOVERY_TOKEN.mint(totalAmount);
+        RECOVERY_TOKEN.mint(address(this), totalAmount);
     }
 
     /**

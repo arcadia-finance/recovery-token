@@ -21,7 +21,9 @@ contract Mint_RecoveryToken_Fuzz_Test is RecoveryToken_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                                 TESTS
     /////////////////////////////////////////////////////////////// */
-    function testFuzz_Revert_mint_NonRecoveryController(address unprivilegedAddress, uint256 amount) public {
+    function testFuzz_Revert_mint_NonRecoveryController(address unprivilegedAddress, address to, uint256 amount)
+        public
+    {
         // Given: Caller is not the "recoveryController".
         vm.assume(unprivilegedAddress != address(recoveryController));
 
@@ -29,20 +31,20 @@ contract Mint_RecoveryToken_Fuzz_Test is RecoveryToken_Fuzz_Test {
         // Then: Transaction should revert with "NotRecoveryController".
         vm.prank(unprivilegedAddress);
         vm.expectRevert(NotRecoveryController.selector);
-        recoveryTokenExtension.mint(amount);
+        recoveryTokenExtension.mint(to, amount);
     }
 
-    function testFuzz_Success_mint(uint256 initialBalance, uint256 amount) public {
+    function testFuzz_Success_mint(address to, uint256 initialBalance, uint256 amount) public {
         // Given "recoveryController" has "initialBalance" tokens.
-        deal(address(recoveryTokenExtension), address(recoveryController), initialBalance);
+        deal(address(recoveryTokenExtension), to, initialBalance);
         // And: Balance does not overflow after mint.
         vm.assume(amount <= type(uint256).max - initialBalance);
 
         // When: "recoveryController" mints "amount".
         vm.prank(address(recoveryController));
-        recoveryTokenExtension.mint(amount);
+        recoveryTokenExtension.mint(to, amount);
 
         // Then: Balance of "recoveryController" should increase with "amount".
-        assertEq(recoveryTokenExtension.balanceOf(address(recoveryController)), initialBalance + amount);
+        assertEq(recoveryTokenExtension.balanceOf(to), initialBalance + amount);
     }
 }

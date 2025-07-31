@@ -5,7 +5,6 @@
 pragma solidity 0.8.30;
 
 import { ERC20 } from "../lib/solmate/src/tokens/ERC20.sol";
-import { IRecoveryToken } from "./interfaces/IRecoveryToken.sol";
 
 /**
  * @title Arcadia Recovery Tokens.
@@ -14,7 +13,7 @@ import { IRecoveryToken } from "./interfaces/IRecoveryToken.sol";
  * @dev The one-to-one redemption of Recovery Tokens for Underlying Tokens,
  * is handled by the Recovery Controller.
  */
-contract RecoveryToken is IRecoveryToken, ERC20 {
+contract RecoveryToken is ERC20 {
     /*//////////////////////////////////////////////////////////////
                                STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -60,11 +59,11 @@ contract RecoveryToken is IRecoveryToken, ERC20 {
 
     /**
      * @notice Mints Recovery Tokens.
+     * @param to The address that receives the minted tokens.
      * @param amount The amount of Recovery Tokens minted.
-     * @dev Only the Recovery Controller can mint tokens before it is activated.
      */
-    function mint(uint256 amount) external onlyRecoveryController {
-        _mint(msg.sender, amount);
+    function mint(address to, uint256 amount) external onlyRecoveryController {
+        _mint(to, amount);
     }
 
     /**
@@ -73,14 +72,5 @@ contract RecoveryToken is IRecoveryToken, ERC20 {
      */
     function burn(uint256 amount) external {
         _burn(msg.sender, amount);
-    }
-
-    /**
-     * @notice Burns Recovery Tokens.
-     * @param from The address from which the tokens are burned.
-     * @param amount The amount of Recovery Tokens burned.
-     */
-    function burn(address from, uint256 amount) external onlyRecoveryController {
-        _burn(from, amount);
     }
 }
