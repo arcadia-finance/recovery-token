@@ -33,15 +33,15 @@ contract RecoveryController is ERC20, Owned {
     // Minimum cooldown period between the termination initiation and finalisation.
     uint256 internal constant COOLDOWN_PERIOD = 1 weeks;
 
+    // The (unwrapped) Recovery Token contract.
+    RecoveryToken public immutable RECOVERY_TOKEN;
+
+    // The contract address of the Underlying Token.
+    ERC20 public immutable UNDERLYING_TOKEN;
+
     /*//////////////////////////////////////////////////////////////
                                STORAGE
     //////////////////////////////////////////////////////////////*/
-
-    // The contract address of the Underlying Token.
-    address internal immutable underlying;
-
-    // The (unwrapped) Recovery Token contract.
-    RecoveryToken public immutable recoveryToken;
 
     // Bool indicating if the contract is activated or not.
     bool public active;
@@ -128,14 +128,14 @@ contract RecoveryController is ERC20, Owned {
 
     /**
      * @param owner_ The address of the Owner.
-     * @param underlying_ The contract address of the Underlying Token.
+     * @param underlyingToken The contract address of the Underlying Token.
      */
-    constructor(address owner_, address underlying_)
-        ERC20("Wrapped Arcadia Recovery Tokens", "wART", ERC20(underlying_).decimals())
+    constructor(address owner_, address underlyingToken)
+        ERC20("Wrapped Arcadia Recovery Tokens", "wART", ERC20(underlyingToken).decimals())
         Owned(owner_)
     {
-        underlying = underlying_;
-        recoveryToken = new RecoveryToken(address(this), decimals);
+        UNDERLYING_TOKEN = ERC20(underlyingToken);
+        RECOVERY_TOKEN = new RecoveryToken(address(this), decimals);
 
         emit ActivationSet(false);
     }
@@ -189,7 +189,7 @@ contract RecoveryController is ERC20, Owned {
      */
     function mint(address to, uint256 amount) external onlyOwner notActive {
         _mint(to, amount);
-        recoveryToken.mint(amount);
+        RECOVERY_TOKEN.mint(amount);
     }
 
     /**
@@ -216,7 +216,7 @@ contract RecoveryController is ERC20, Owned {
             }
         }
 
-        recoveryToken.mint(totalAmount);
+        RECOVERY_TOKEN.mint(totalAmount);
     }
 
     /**
@@ -234,7 +234,7 @@ contract RecoveryController is ERC20, Owned {
         _burn(from, amount);
 
         // Burn the corresponding Recovery Tokens held by the controller.
-        recoveryToken.burn(amount);
+        RECOVERY_TOKEN.burn(amount);
     }
 
     /**
@@ -269,7 +269,7 @@ contract RecoveryController is ERC20, Owned {
         }
 
         // Burn the corresponding Recovery Tokens held by the controller.
-        recoveryToken.burn(totalAmount);
+        RECOVERY_TOKEN.burn(totalAmount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -285,7 +285,7 @@ contract RecoveryController is ERC20, Owned {
         if (amount == 0) revert DepositAmountZero();
 
         _distributeUnderlying(amount);
-        ERC20(underlying).safeTransferFrom(msg.sender, address(this), amount);
+        UNDERLYING_TOKEN.safeTransferFrom(msg.sender, address(this), amount);
     }
 
     /**
@@ -336,7 +336,7 @@ contract RecoveryController is ERC20, Owned {
 
         // Reentrancy: recoveryToken is a trusted contract without hooks or external calls.
         // Recovery Tokens need to be transferred to Controller before a position can be closed.
-        recoveryToken.transferFrom(msg.sender, address(this), amount);
+        RECOVERY_TOKEN.transferFrom(msg.sender, address(this), amount);
 
         if (initialBalance != 0) {
             redeemedLast = redeemed[msg.sender];
@@ -414,7 +414,7 @@ contract RecoveryController is ERC20, Owned {
             }
 
             // Withdraw the Recovery Tokens to the owner.
-            recoveryToken.transfer(msg.sender, amount);
+            RECOVERY_TOKEN.transfer(msg.sender, amount);
         }
 
         // Reentrancy: Transfer the Underlying Tokens after logic.
@@ -463,10 +463,10 @@ contract RecoveryController is ERC20, Owned {
      */
     function _redeemUnderlying(address to, uint256 amount) internal {
         // Burn the redeemed recovery tokens.
-        recoveryToken.burn(amount);
+        RECOVERY_TOKEN.burn(amount);
         // Send equal amount of underlying assets.
         // Reentrancy: Transfer the Underlying Tokens after logic.
-        ERC20(underlying).safeTransfer(to, amount);
+        UNDERLYING_TOKEN.safeTransfer(to, amount);
     }
 
     /**
@@ -480,7 +480,7 @@ contract RecoveryController is ERC20, Owned {
             _distributeUnderlying(surplus);
         } else {
             // All positions are recovered, send any remaining Underlying Tokens back to the Protocol Owner.
-            ERC20(underlying).safeTransfer(owner, ERC20(underlying).balanceOf(address(this)) - redeemable);
+            UNDERLYING_TOKEN.safeTransfer(owner, UNDERLYING_TOKEN.balanceOf(address(this)) - redeemable);
         }
     }
 
@@ -521,7 +521,7 @@ contract RecoveryController is ERC20, Owned {
         active = false;
 
         // Withdraw any remaining Underlying Tokens back to the Protocol Owner.
-        ERC20(underlying).safeTransfer(owner, ERC20(underlying).balanceOf(address(this)));
+        UNDERLYING_TOKEN.safeTransfer(owner, UNDERLYING_TOKEN.balanceOf(address(this)));
 
         emit ActivationSet(false);
     }
