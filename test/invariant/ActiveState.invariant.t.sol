@@ -16,9 +16,6 @@ contract ActiveState_Invariant_Test is Invariant_Test {
                                      VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
 
-    uint256 internal initialSupplySRT;
-    uint256 internal lastSupplyRT;
-
     /*//////////////////////////////////////////////////////////////////////////
                                    TEST CONTRACTS
     //////////////////////////////////////////////////////////////////////////*/
@@ -61,9 +58,6 @@ contract ActiveState_Invariant_Test is Invariant_Test {
         // Set Recovery Contracts on active.
         recoveryController.activate();
         vm.stopPrank();
-
-        lastSupplyRT = recoveryToken.totalSupply();
-        initialSupplySRT = stakedRecoveryToken.totalSupply();
     }
 
     function mintWrappedRecoveryTokens(address to, uint256 amount) internal {
@@ -74,17 +68,4 @@ contract ActiveState_Invariant_Test is Invariant_Test {
     /*//////////////////////////////////////////////////////////////////////////
                                      INVARIANTS
     //////////////////////////////////////////////////////////////////////////*/
-
-    function invariant_RtLastSupplyGeRtSupply() external {
-        assertGe(lastSupplyRT, recoveryToken.totalSupply(), unicode"Invariant violation: SRT_supply_last < SRT_supply");
-        lastSupplyRT = recoveryToken.totalSupply();
-    }
-
-    function invariant_SrtInitialSupplyGeSrtSupply() external {
-        assertGe(
-            initialSupplySRT,
-            stakedRecoveryToken.totalSupply(),
-            unicode"Invariant violation: SRT_supply_initial < SRT_supply"
-        );
-    }
 }

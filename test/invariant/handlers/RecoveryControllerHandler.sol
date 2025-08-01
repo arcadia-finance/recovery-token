@@ -49,4 +49,13 @@ abstract contract RecoveryControllerHandler is BaseHandler {
     /*//////////////////////////////////////////////////////////////////////////
                                     FUNCTIONS
     //////////////////////////////////////////////////////////////////////////*/
+
+    function mintRecoveryTokens(uint256 actorIndexSeed, uint256 amount) external {
+        address to = state.getActor(actorIndexSeed);
+
+        amount = bound(amount, 0, 1e10);
+
+        vm.prank(recoveryController.owner());
+        recoveryController.mintRecoveryTokens(to, amount);
+    }
 }

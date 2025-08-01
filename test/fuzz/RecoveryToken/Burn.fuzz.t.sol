@@ -10,7 +10,7 @@ import { stdError } from "../../../lib/forge-std/src/StdError.sol";
 /**
  * @notice Fuzz tests for the function "burn" of "RecoveryToken".
  */
-contract Burn_1Arg_RecoveryToken_Fuzz_Test is RecoveryToken_Fuzz_Test {
+contract Burn_RecoveryToken_Fuzz_Test is RecoveryToken_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                                 SETUP
     /////////////////////////////////////////////////////////////// */
@@ -22,9 +22,7 @@ contract Burn_1Arg_RecoveryToken_Fuzz_Test is RecoveryToken_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                                 TESTS
     /////////////////////////////////////////////////////////////// */
-    function testFuzz_Revert_burn_1arg_InsufficientBalance(address user, uint256 initialBalance, uint256 amount)
-        public
-    {
+    function testFuzz_Revert_burn_InsufficientBalance(address user, uint256 initialBalance, uint256 amount) public {
         // Given "user" has "initialBalance" tokens.
         deal(address(recoveryTokenExtension), user, initialBalance);
         // And: "amount" is bigger as "initialBalance".
@@ -37,7 +35,7 @@ contract Burn_1Arg_RecoveryToken_Fuzz_Test is RecoveryToken_Fuzz_Test {
         recoveryTokenExtension.burn(amount);
     }
 
-    function testFuzz_Success_burn_1arg(address user, uint256 initialBalance, uint256 amount) public {
+    function testFuzz_Success_burn(address user, uint256 initialBalance, uint256 amount) public {
         // Given "user" has "initialBalance" tokens.
         deal(address(recoveryTokenExtension), user, initialBalance);
         // And: "amount" is smaller or equal as "initialBalance".
