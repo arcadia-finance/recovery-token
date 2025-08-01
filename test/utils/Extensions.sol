@@ -13,7 +13,7 @@ import { RecoveryToken } from "../../src/RecoveryToken.sol";
  * As such the complete space of possible state configurations can be tested.
  */
 contract RecoveryControllerExtension is RecoveryController {
-    constructor(address underlying_) RecoveryController(underlying_) { }
+    constructor(address owner_, address underlying_) RecoveryController(owner_, underlying_) { }
 
     function setTerminationTimestamp(uint32 terminationTimestamp_) public {
         terminationTimestamp = terminationTimestamp_;
