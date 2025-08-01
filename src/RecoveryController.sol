@@ -77,7 +77,7 @@ contract RecoveryController is ERC20, Owned {
     // Thrown if the Contract is terminated.
     error ControllerTerminated();
 
-    // Thrown if arrays are not equal in length..
+    // Thrown if arrays are not equal in length.
     error LengthMismatch();
 
     // Thrown if the Contract is not active.
