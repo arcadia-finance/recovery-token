@@ -32,7 +32,7 @@ abstract contract Fork_Test is Base_Test {
     struct TestVars {
         address primaryHolder;
         address depositor;
-        uint256 balanceWRT;
+        uint256 balanceSRT;
         uint256 depositAmountUT;
     }
 
@@ -73,10 +73,10 @@ abstract contract Fork_Test is Base_Test {
         vm.assume(vars.depositor != USDC_WHALE);
     }
 
-    function givenValidBalanceWRT(TestVars memory vars) internal view returns (TestVars memory) {
-        // Constraints "balanceWRT":
+    function givenValidBalanceSRT(TestVars memory vars) internal view returns (TestVars memory) {
+        // Constraints "balanceSRT":
         // - Greater than zero.
-        vars.balanceWRT = bound(vars.balanceWRT, 1, type(uint256).max);
+        vars.balanceSRT = bound(vars.balanceSRT, 1, type(uint256).max);
 
         return vars;
     }
@@ -95,9 +95,9 @@ abstract contract Fork_Test is Base_Test {
     function givenPositionIsNotFullyRedeemable(TestVars memory vars) internal view returns (TestVars memory) {
         givenValidDepositAmountUT(vars);
 
-        // Constraints "balanceWRT":
-        // - Position is not fully recovered: "depositAmountUT < balanceWRT"
-        vars.balanceWRT = bound(vars.balanceWRT, vars.depositAmountUT + 1, type(uint256).max);
+        // Constraints "balanceSRT":
+        // - Position is not fully recovered: "depositAmountUT < balanceSRT"
+        vars.balanceSRT = bound(vars.balanceSRT, vars.depositAmountUT + 1, type(uint256).max);
 
         return vars;
     }
@@ -105,18 +105,18 @@ abstract contract Fork_Test is Base_Test {
     function givenPositionIsFullyRedeemable(TestVars memory vars) internal view returns (TestVars memory) {
         givenValidDepositAmountUT(vars);
 
-        // Constraints "balanceWRT":
+        // Constraints "balanceSRT":
         // - Greater than zero.
-        // - Position is fully recovered: "depositAmountUT >= balanceWRT".
-        vars.balanceWRT = bound(vars.balanceWRT, 1, vars.depositAmountUT);
+        // - Position is fully recovered: "depositAmountUT >= balanceSRT".
+        vars.balanceSRT = bound(vars.balanceSRT, 1, vars.depositAmountUT);
 
         return vars;
     }
 
     function mintAndDeposit(TestVars memory vars) internal {
-        // Mint "balanceWRT" for "primaryHolder".
+        // Mint "balanceSRT" for "primaryHolder".
         vm.prank(users.owner);
-        recoveryController.mint(vars.primaryHolder, vars.balanceWRT);
+        recoveryController.mint(vars.primaryHolder, vars.balanceSRT);
 
         // Activate Controller.
         vm.prank(users.owner);

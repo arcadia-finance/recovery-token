@@ -15,7 +15,7 @@ contract Inactive_Invariant_Test is Invariant_Test {
                                      VARIABLES
     //////////////////////////////////////////////////////////////////////////*/
 
-    uint256 internal lastSupplyWRT;
+    uint256 internal lastSupplySRT;
     uint256 internal lastSupplyRT;
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -45,8 +45,8 @@ contract Inactive_Invariant_Test is Invariant_Test {
         excludeSender(address(recoveryControllerHandler));
 
         // Add actors who should receive Recovery Tokens.
-        state.addActor(users.holderWRT0);
-        state.addActor(users.holderWRT1);
+        state.addActor(users.holderSRT0);
+        state.addActor(users.holderSRT1);
     }
 
     /*//////////////////////////////////////////////////////////////////////////

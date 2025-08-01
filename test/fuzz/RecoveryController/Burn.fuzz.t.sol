@@ -68,8 +68,8 @@ contract Burn_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test {
         vm.prank(users.owner);
         recoveryControllerExtension.burn(from, amount);
 
-        // Then: "wrappedRecoveryToken" balance of "user" should decrease with "amount".
-        assertEq(wrappedRecoveryToken.balanceOf(from), initialBalanceFrom - amount);
+        // Then: "stakedRecoveryToken" balance of "user" should decrease with "amount".
+        assertEq(stakedRecoveryToken.balanceOf(from), initialBalanceFrom - amount);
         // And: "recoveryToken" balance of "recoveryController" should decrease with "amount".
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - amount);
     }
@@ -96,7 +96,7 @@ contract Burn_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test {
         recoveryControllerExtension.burn(from, amount);
 
         // Then: "user" state variables are updated.
-        assertEq(wrappedRecoveryToken.balanceOf(from), 0);
+        assertEq(stakedRecoveryToken.balanceOf(from), 0);
         // And: "recoveryToken" balance of "recoveryController" should decrease with "initialBalanceFrom".
         assertEq(
             recoveryToken.balanceOf(address(recoveryControllerExtension)), controllerBalanceRT - initialBalanceFrom

@@ -24,15 +24,15 @@ contract DistributeUnderlying_RecoveryController_Fuzz_Test is RecoveryController
     /* ///////////////////////////////////////////////////////////////
                                 TESTS
     /////////////////////////////////////////////////////////////// */
-    function testFuzz_Success_distributeUnderlying(uint256 redeemablePerRTokenGlobal, uint256 amount, uint256 supplyWRT)
+    function testFuzz_Success_distributeUnderlying(uint256 redeemablePerRTokenGlobal, uint256 amount, uint256 supplySRT)
         public
     {
-        // Given: supplyWRT is non-zero.
-        vm.assume(supplyWRT > 0);
+        // Given: supplySRT is non-zero.
+        vm.assume(supplySRT > 0);
 
         // And: New redeemablePerRTokenGlobal does not overflow.
         amount = bound(amount, 0, type(uint256).max / 1e18);
-        uint256 delta = amount * 1e18 / supplyWRT;
+        uint256 delta = amount * 1e18 / supplySRT;
         redeemablePerRTokenGlobal = bound(redeemablePerRTokenGlobal, 0, type(uint256).max - delta);
 
         // And: State is persisted.
@@ -40,7 +40,7 @@ contract DistributeUnderlying_RecoveryController_Fuzz_Test is RecoveryController
             recoveryControllerExtension.redeemablePerRTokenGlobal.selector
         ).checked_write(redeemablePerRTokenGlobal);
         stdstore.target(address(recoveryControllerExtension)).sig(recoveryControllerExtension.totalSupply.selector)
-            .checked_write(supplyWRT);
+            .checked_write(supplySRT);
 
         // When: "amount" of "underlyingToken" is distributed.
         recoveryControllerExtension.distributeUnderlying(amount);

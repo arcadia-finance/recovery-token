@@ -93,9 +93,9 @@ contract BatchMint_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test 
             vm.assume(amounts[i] <= type(uint256).max - initialBalanceTos[i]);
             expectedBalanceController += amounts[i];
         }
-        // And: "tos" have "initialBalanceTos" of "wrappedRecoveryToken".
+        // And: "tos" have "initialBalanceTos" of "stakedRecoveryToken".
         for (uint256 i; i < tos_.length; ++i) {
-            deal(address(wrappedRecoveryToken), tos_[i], initialBalanceTos[i]);
+            deal(address(stakedRecoveryToken), tos_[i], initialBalanceTos[i]);
         }
         // And: "recoveryController" has "initialBalanceController" of "recoveryToken".
         deal(address(recoveryToken), address(recoveryControllerExtension), initialBalanceController);
@@ -104,9 +104,9 @@ contract BatchMint_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test 
         vm.prank(users.owner);
         recoveryControllerExtension.batchMint(tos_, amounts_);
 
-        // Then: "wrappedRecoveryToken" balance of each "tos[i]" should increase with "amounts[i]".
+        // Then: "stakedRecoveryToken" balance of each "tos[i]" should increase with "amounts[i]".
         for (uint256 i; i < tos_.length; ++i) {
-            assertEq(wrappedRecoveryToken.balanceOf(tos_[i]), initialBalanceTos_[i] + amounts_[i]);
+            assertEq(stakedRecoveryToken.balanceOf(tos_[i]), initialBalanceTos_[i] + amounts_[i]);
         }
         // And: "recoveryToken" balance of "recoveryController" should increase with sum of all "amounts".
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), expectedBalanceController);

@@ -8,9 +8,9 @@ import { ControllerState, UserState } from "../../utils/Types.sol";
 import { RecoveryController_Fuzz_Test } from "./_RecoveryController.fuzz.t.sol";
 
 /**
- * @notice Fuzz tests for the function "withdrawRecoveryTokens" of "RecoveryController".
+ * @notice Fuzz tests for the function "unstakeRecoveryTokens" of "RecoveryController".
  */
-contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test {
+contract UnstakeRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                                 SETUP
     /////////////////////////////////////////////////////////////// */
@@ -22,28 +22,28 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
     /* ///////////////////////////////////////////////////////////////
                                 TESTS
     /////////////////////////////////////////////////////////////// */
-    function testFuzz_Revert_withdrawRecoveryTokens_NotActive(address user, uint256 amount) public {
+    function testFuzz_Revert_unstakeRecoveryTokens_NotActive(address user, uint256 amount) public {
         // Given: "RecoveryController" is not active.
 
-        // When: "user" calls "withdrawRecoveryTokens" with "amount".
+        // When: "user" calls "unstakeRecoveryTokens" with "amount".
         // Then: Transaction reverts with "NotActive".
         vm.prank(user);
         vm.expectRevert(NotActive.selector);
-        recoveryControllerExtension.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.unstakeRecoveryTokens(amount);
     }
 
-    function testFuzz_Revert_withdrawRecoveryTokens_ZeroAmount(address user) public {
+    function testFuzz_Revert_unstakeRecoveryTokens_ZeroAmount(address user) public {
         // Given: "RecoveryController" is active.
         recoveryControllerExtension.setActive(true);
 
-        // When: "user" calls "withdrawRecoveryTokens" with 0 amount.
-        // Then: Transaction reverts with "WRT: WithdrawAmountZero".
+        // When: "user" calls "unstakeRecoveryTokens" with 0 amount.
+        // Then: Transaction reverts with "SRT: ZeroAmount".
         vm.prank(user);
-        vm.expectRevert(WithdrawAmountZero.selector);
-        recoveryControllerExtension.withdrawRecoveryTokens(0);
+        vm.expectRevert(ZeroAmount.selector);
+        recoveryControllerExtension.unstakeRecoveryTokens(0);
     }
 
-    function testFuzz_Success_withdrawRecoveryTokens_NonRecoveredPosition(
+    function testFuzz_Success_unstakeRecoveryTokens_NonRecoveredPosition(
         uint256 amount,
         UserState memory user,
         ControllerState memory controller
@@ -54,7 +54,7 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
 
-        // And: Amount is strictly greater as zero (zero amount reverts see: testFuzz_Revert_withdrawRecoveryTokens_ZeroAmount).
+        // And: Amount is strictly greater as zero (zero amount reverts see: testFuzz_Revert_unstakeRecoveryTokens_ZeroAmount).
         uint256 minAmount = 1;
         // And: The position is not fully covered (test-condition NonRecoveredPosition).
         // -> "openPosition is strictly greater as "redeemable" + amount".
@@ -68,12 +68,12 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         setUserState(user);
         setControllerState(controller);
 
-        // When: "user" calls "withdrawRecoveryTokens".
+        // When: "user" calls "unstakeRecoveryTokens".
         vm.prank(user.addr);
-        recoveryControllerExtension.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.unstakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
-        assertEq(wrappedRecoveryToken.balanceOf(user.addr), user.balanceWRT - amount);
+        assertEq(stakedRecoveryToken.balanceOf(user.addr), user.balanceSRT - amount);
         assertEq(recoveryControllerExtension.redeemed(user.addr), user.redeemed + redeemable);
         assertEq(
             recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), controller.redeemablePerRTokenGlobal
@@ -82,14 +82,14 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + redeemable);
 
         // And: "controller" state variables are updated.
-        assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - amount);
+        assertEq(stakedRecoveryToken.totalSupply(), controller.supplySRT - amount);
         assertEq(
             recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - amount - redeemable
         );
         assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - redeemable);
     }
 
-    function testFuzz_Success_withdrawRecoveryTokens_FullyRecoveredPosition_WithWithdrawal_LastPosition(
+    function testFuzz_Success_unstakeRecoveryTokens_FullyRecoveredPosition_WithWithdrawal_LastPosition(
         uint256 amount,
         UserState memory user,
         ControllerState memory controller
@@ -111,25 +111,25 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         amount = bound(amount, minAmount, type(uint256).max);
 
         // And: "totalSupply" equals the balance of the user (test-condition LastPosition).
-        controller.supplyWRT = user.balanceWRT;
+        controller.supplySRT = user.balanceSRT;
 
         // And: State is persisted.
         setUserState(user);
         setControllerState(controller);
 
-        // When: "user" calls "withdrawRecoveryTokens".
+        // When: "user" calls "unstakeRecoveryTokens".
         vm.prank(user.addr);
-        recoveryControllerExtension.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.unstakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
-        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(stakedRecoveryToken.balanceOf(user.addr), 0);
         assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
         assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT + openPosition - redeemable);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + redeemable);
 
         // And: "controller" state variables are updated.
-        assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - user.balanceWRT);
+        assertEq(stakedRecoveryToken.totalSupply(), controller.supplySRT - user.balanceSRT);
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
         assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), 0);
 
@@ -137,7 +137,7 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - redeemable);
     }
 
-    function testFuzz_Success_withdrawRecoveryTokens_FullyRecoveredPosition_WithWithdrawal_NotLastPosition(
+    function testFuzz_Success_unstakeRecoveryTokens_FullyRecoveredPosition_WithWithdrawal_NotLastPosition(
         uint256 amount,
         UserState memory user,
         ControllerState memory controller
@@ -159,26 +159,26 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         amount = bound(amount, minAmount, type(uint256).max);
 
         // And: "totalSupply" is strictly bigger as the balance of the user (test-condition NotLastPosition).
-        vm.assume(user.balanceWRT < type(uint256).max);
-        controller.supplyWRT = bound(controller.supplyWRT, user.balanceWRT + 1, type(uint256).max);
+        vm.assume(user.balanceSRT < type(uint256).max);
+        controller.supplySRT = bound(controller.supplySRT, user.balanceSRT + 1, type(uint256).max);
 
         // And: State is persisted.
         setUserState(user);
         setControllerState(controller);
 
-        // When: "user" calls "withdrawRecoveryTokens".
+        // When: "user" calls "unstakeRecoveryTokens".
         vm.prank(user.addr);
-        recoveryControllerExtension.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.unstakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
-        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(stakedRecoveryToken.balanceOf(user.addr), 0);
         assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
         assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT + openPosition - redeemable);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + redeemable);
 
         // And: "controller" state variables are updated.
-        assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - user.balanceWRT);
+        assertEq(stakedRecoveryToken.totalSupply(), controller.supplySRT - user.balanceSRT);
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
         assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - redeemable);
 
@@ -186,7 +186,7 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         assertEq(underlyingToken.balanceOf(users.owner), 0);
     }
 
-    function testFuzz_Success_withdrawRecoveryTokens_FullyRecoveredPosition_WithoutWithdrawal_LastPosition(
+    function testFuzz_Success_unstakeRecoveryTokens_FullyRecoveredPosition_WithoutWithdrawal_LastPosition(
         uint256 amount,
         UserState memory user,
         ControllerState memory controller
@@ -204,11 +204,11 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
         vm.assume(openPosition <= redeemable);
 
-        // And: Amount is strictly greater as zero (zero amount reverts see: testFuzz_Revert_withdrawRecoveryTokens_ZeroAmount).
+        // And: Amount is strictly greater as zero (zero amount reverts see: testFuzz_Revert_unstakeRecoveryTokens_ZeroAmount).
         amount = bound(amount, 1, type(uint256).max);
 
         // And: "totalSupply" equals the balance of the user (test-condition LastPosition).
-        controller.supplyWRT = user.balanceWRT;
+        controller.supplySRT = user.balanceSRT;
 
         // And: Assume "surplus" does not overflow (unrealistic big numbers).
         vm.assume(redeemable <= type(uint256).max - user.redeemed);
@@ -217,19 +217,19 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         setUserState(user);
         setControllerState(controller);
 
-        // When: "user" calls "withdrawRecoveryTokens".
+        // When: "user" calls "unstakeRecoveryTokens".
         vm.prank(user.addr);
-        recoveryControllerExtension.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.unstakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
-        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(stakedRecoveryToken.balanceOf(user.addr), 0);
         assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
         assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
 
         // And: "controller" state variables are updated.
-        assertEq(wrappedRecoveryToken.totalSupply(), 0);
+        assertEq(stakedRecoveryToken.totalSupply(), 0);
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
         assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), 0);
 
@@ -237,7 +237,7 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         assertEq(underlyingToken.balanceOf(users.owner), controller.balanceUT - openPosition);
     }
 
-    function testFuzz_Success_withdrawRecoveryTokens_FullyRecoveredPosition_WithoutWithdrawal_NotLastPosition(
+    function testFuzz_Success_unstakeRecoveryTokens_FullyRecoveredPosition_WithoutWithdrawal_NotLastPosition(
         uint256 amount,
         UserState memory user,
         ControllerState memory controller
@@ -255,19 +255,19 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         (uint256 redeemable, uint256 openPosition) = calculateRedeemableAndOpenAmount(user, controller);
         vm.assume(openPosition <= redeemable);
 
-        // And: Amount is strictly greater as zero (zero amount reverts see: testFuzz_Revert_withdrawRecoveryTokens_ZeroAmount).
+        // And: Amount is strictly greater as zero (zero amount reverts see: testFuzz_Revert_unstakeRecoveryTokens_ZeroAmount).
         amount = bound(amount, 1, type(uint256).max);
 
         // And: "totalSupply" is strictly bigger as the balance of the user (test-condition NotLastPosition).
-        vm.assume(user.balanceWRT < type(uint256).max);
-        controller.supplyWRT = bound(controller.supplyWRT, user.balanceWRT + 1, type(uint256).max);
+        vm.assume(user.balanceSRT < type(uint256).max);
+        controller.supplySRT = bound(controller.supplySRT, user.balanceSRT + 1, type(uint256).max);
 
         // And: Assume "surplus" does not overflow (unrealistic big numbers).
         vm.assume(redeemable <= type(uint256).max - user.redeemed);
-        uint256 surplus = user.redeemed + redeemable - user.balanceWRT;
+        uint256 surplus = user.redeemed + redeemable - user.balanceSRT;
         // And: Assume "delta" does not overflow (unrealistic big numbers).
         vm.assume(surplus <= type(uint256).max / 1e18);
-        uint256 delta = surplus * 1e18 / (controller.supplyWRT - user.balanceWRT);
+        uint256 delta = surplus * 1e18 / (controller.supplySRT - user.balanceSRT);
         // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
         vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
 
@@ -275,19 +275,19 @@ contract WithdrawRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControll
         setUserState(user);
         setControllerState(controller);
 
-        // When: "user" calls "withdrawRecoveryTokens".
+        // When: "user" calls "unstakeRecoveryTokens".
         vm.prank(user.addr);
-        recoveryControllerExtension.withdrawRecoveryTokens(amount);
+        recoveryControllerExtension.unstakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
-        assertEq(wrappedRecoveryToken.balanceOf(user.addr), 0);
+        assertEq(stakedRecoveryToken.balanceOf(user.addr), 0);
         assertEq(recoveryControllerExtension.redeemed(user.addr), 0);
         assertEq(recoveryControllerExtension.getRedeemablePerRTokenLast(user.addr), 0);
         assertEq(recoveryToken.balanceOf(user.addr), user.balanceRT);
         assertEq(underlyingToken.balanceOf(user.addr), user.balanceUT + openPosition);
 
         // And: "controller" state variables are updated.
-        assertEq(wrappedRecoveryToken.totalSupply(), controller.supplyWRT - user.balanceWRT);
+        assertEq(stakedRecoveryToken.totalSupply(), controller.supplySRT - user.balanceSRT);
         assertEq(recoveryControllerExtension.redeemablePerRTokenGlobal(), controller.redeemablePerRTokenGlobal + delta);
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), controller.balanceRT - openPosition);
         assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT - openPosition);

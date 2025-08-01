@@ -13,14 +13,10 @@ import { SafeTransferLib } from "../lib/solmate/src/utils/SafeTransferLib.sol";
 /**
  * @title Recovery Controller.
  * @author Pragma Labs
- * @notice Handles the accounting and redemption of Recovery Tokens for Underlying Tokens,
- * both if assets are redeemed via legal means, or if the lost assets are redeemed via other means.
- * In the second situation the underlying assets will be distributed pro-rata to all holders of
- * Wrapped Recovery Tokens in discrete batches.
+ * @notice Handles the distribution and redemption of Recovery Tokens for Underlying Tokens,
  * @dev Recovery Tokens can be redeemed one-to-one for Underlying Tokens.
  * @dev Recovery Tokens will only be eligible for redemption to Underlying Tokens after they are
- * deposited (wrapped) in this Recovery contract. It uses a modification of the ERC20 standard (non-transferrable)
- * to do the accounting of deposited Recovery Token Balances.
+ * staked.
  */
 contract RecoveryController is ERC20, Owned {
     using FixedPointMathLib for uint256;
@@ -33,28 +29,28 @@ contract RecoveryController is ERC20, Owned {
     // Minimum cooldown period between the termination initiation and finalisation.
     uint256 internal constant COOLDOWN_PERIOD = 1 weeks;
 
-    // The (unwrapped) Recovery Token contract.
+    // The contract address of the (unstaked) Recovery Tokens.
     RecoveryToken public immutable RECOVERY_TOKEN;
 
-    // The contract address of the Underlying Token.
+    // The contract address of the Underlying Tokens.
     ERC20 public immutable UNDERLYING_TOKEN;
 
     /*//////////////////////////////////////////////////////////////
                                STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    // Bool indicating if the contract is activated or not.
+    // Bool indicating if the contract is activated.
     bool public active;
 
-    // Timestamp that the termination of the contract is initiated.
+    // Timestamp when the termination of the contract is initiated.
     uint32 public terminationTimestamp;
 
-    // The growth of Underlying Tokens redeemed per Wrapped Recovery Token for the entire life of the contract.
+    // The growth of Underlying Tokens redeemed per Staked Recovery Token for the entire life of the contract.
     uint256 public redeemablePerRTokenGlobal;
 
-    // Map tokenHolder => Growth of Underlying Tokens redeemed per Wrapped Recovery Token at the owner last interaction.
+    // Map user => Growth of Underlying Tokens redeemed per Staked Recovery Token at the owner last interaction.
     mapping(address => uint256) public redeemablePerRTokenLast;
-    // Map tokenHolder => Amount of Recovery Tokens redeemed for Underlying Tokens.
+    // Map user => Amount of Recovery Tokens redeemed for Underlying Tokens.
     mapping(address => uint256) public redeemed;
 
     /* //////////////////////////////////////////////////////////////
@@ -75,30 +71,26 @@ contract RecoveryController is ERC20, Owned {
     /*//////////////////////////////////////////////////////////////
                                ERRORS
     //////////////////////////////////////////////////////////////*/
+    // Thrown if the Contract is active.
+    error Active();
 
     // Thrown if the Contract is terminated.
     error ControllerTerminated();
 
+    // Thrown if arrays are not equal in length.
+    error LengthMismatch();
+
     // Thrown if the Contract is not active.
     error NotActive();
-
-    // Thrown if the Contract is active.
-    error Active();
 
     // Thrown on transfers.
     error NoTransfersAllowed();
 
-    // Thrown if arrays are not equal in length..
-    error LengthMismatch();
-
-    // Thrown when trying to deposit zero assets.
-    error DepositAmountZero();
-
-    // Thrown when trying to withdraw zero assets.
-    error WithdrawAmountZero();
-
     // Thrown when less time as the cooldown period passed between the termination initiation and finalisation.
     error TerminationCoolDownPeriodNotPassed();
+
+    // Thrown when input amount is zero.
+    error ZeroAmount();
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -131,7 +123,7 @@ contract RecoveryController is ERC20, Owned {
      * @param underlyingToken The contract address of the Underlying Token.
      */
     constructor(address owner_, address underlyingToken)
-        ERC20("Wrapped Arcadia Recovery Tokens", "wART", ERC20(underlyingToken).decimals())
+        ERC20("Staked Arcadia Recovery Tokens", "stART", ERC20(underlyingToken).decimals())
         Owned(owner_)
     {
         UNDERLYING_TOKEN = ERC20(underlyingToken);
@@ -181,11 +173,11 @@ contract RecoveryController is ERC20, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Mints Wrapped Recovery Tokens.
+     * @notice Mints Staked Recovery Tokens.
      * @param to The address that receives the minted tokens.
      * @param amount The amount of tokens minted.
      * @dev Mints an amount of Recovery Tokens to the controller,
-     * equal to the minted Wrapped Recovery Tokens.
+     * equal to the minted Staked Recovery Tokens.
      */
     function mint(address to, uint256 amount) external onlyOwner notActive {
         _mint(to, amount);
@@ -193,11 +185,11 @@ contract RecoveryController is ERC20, Owned {
     }
 
     /**
-     * @notice Batch mints Wrapped Recovery Tokens.
+     * @notice Batch mints Staked Recovery Tokens.
      * @param tos Array with addresses that receives the minted tokens.
      * @param amounts Array with amounts of tokens minted.
      * @dev Mints an amount of Recovery Tokens to the controller,
-     * equal to the sum of all minted Wrapped Recovery Tokens.
+     * equal to the sum of all minted Staked Recovery Tokens.
      */
     function batchMint(address[] calldata tos, uint256[] calldata amounts) external onlyOwner notActive {
         uint256 length = tos.length;
@@ -220,16 +212,16 @@ contract RecoveryController is ERC20, Owned {
     }
 
     /**
-     * @notice Burns Wrapped Recovery Tokens.
+     * @notice Burns Staked Recovery Tokens.
      * @param from The address from which the tokens are burned.
      * @param amount The amount of tokens burned.
      * @dev Burns an amount of Recovery Tokens, held by the controller,
-     * equal to the burned unredeemed Wrapped Recovery Tokens.
+     * equal to the burned unredeemed Staked Recovery Tokens.
      */
     function burn(address from, uint256 amount) external onlyOwner notActive {
         uint256 openPosition = balanceOf[from];
 
-        // Burn the Wrapped Recovery Tokens.
+        // Burn the Staked Recovery Tokens.
         if (amount >= openPosition) amount = openPosition;
         _burn(from, amount);
 
@@ -238,11 +230,11 @@ contract RecoveryController is ERC20, Owned {
     }
 
     /**
-     * @notice Batch burns Wrapped Recovery Tokens.
+     * @notice Batch burns Staked Recovery Tokens.
      * @param froms Array with addresses from which the tokens are burned.
      * @param amounts Array with amounts of tokens burned.
      * @dev Burns an amount of Recovery Tokens, held by the controller,
-     * equal to the sum of all burned unredeemed Wrapped Recovery Tokens.
+     * equal to the sum of all burned unredeemed Staked Recovery Tokens.
      */
     function batchBurn(address[] calldata froms, uint256[] calldata amounts) external onlyOwner notActive {
         uint256 length = froms.length;
@@ -258,7 +250,7 @@ contract RecoveryController is ERC20, Owned {
             openPosition = balanceOf[from];
             amount = amounts[i];
 
-            // Burn the Wrapped Recovery Tokens.
+            // Burn the Staked Recovery Tokens.
             if (amount >= openPosition) amount = openPosition;
             _burn(from, amount);
 
@@ -278,11 +270,11 @@ contract RecoveryController is ERC20, Owned {
 
     /**
      * @notice Deposits the underlying assets to this contract.
-     * Deposited assets become redeemable pro-rata by the Wrapped Recovery Token Holders.
+     * Deposited assets become redeemable pro-rata by the Staked Recovery Token Holders.
      * @param amount The amount of underlying tokens deposited.
      */
     function depositUnderlying(uint256 amount) external isActive {
-        if (amount == 0) revert DepositAmountZero();
+        if (amount == 0) revert ZeroAmount();
 
         _distributeUnderlying(amount);
         UNDERLYING_TOKEN.safeTransferFrom(msg.sender, address(this), amount);
@@ -290,7 +282,7 @@ contract RecoveryController is ERC20, Owned {
 
     /**
      * @notice Redeems Recovery Tokens for Underlying Tokens.
-     * @param owner_ The owner of the wrapped Recovery Tokens.
+     * @param owner_ The owner of the Staked Recovery Tokens.
      * @dev Everyone can call the redeem function for any address.
      */
     function redeemUnderlying(address owner_) external isActive {
@@ -321,13 +313,13 @@ contract RecoveryController is ERC20, Owned {
     }
 
     /**
-     * @notice Deposits (wraps) Recovery Tokens.
+     * @notice Stakes Recovery Tokens.
      * @param amount The non-redeemed rTokens deposited.
-     * @dev Holders of Recovery Tokens need to deposit the tokens in this contract before
+     * @dev Holders of Recovery Tokens need to stake the tokens in this contract before
      * they can redeem the Recovery Tokens for redeemed Underlying Tokens.
      */
-    function depositRecoveryTokens(uint256 amount) external isActive {
-        if (amount == 0) revert DepositAmountZero();
+    function stakeRecoveryTokens(uint256 amount) external isActive {
+        if (amount == 0) revert ZeroAmount();
 
         // Cache token balances.
         uint256 initialBalance = balanceOf[msg.sender];
@@ -369,13 +361,11 @@ contract RecoveryController is ERC20, Owned {
     }
 
     /**
-     * @notice Withdraws (unwraps) Recovery Tokens.
+     * @notice Unstakes Recovery Tokens.
      * @param amount The non-redeemed rTokens withdrawn.
-     * @dev Holders of Recovery Tokens need to deposit the tokens in this contract before
-     * they can redeem the Recovery Tokens for redeemed Underlying Tokens.
      */
-    function withdrawRecoveryTokens(uint256 amount) external isActive {
-        if (amount == 0) revert WithdrawAmountZero();
+    function unstakeRecoveryTokens(uint256 amount) external isActive {
+        if (amount == 0) revert ZeroAmount();
 
         // Cache token balances.
         uint256 initialBalance = balanceOf[msg.sender];
@@ -423,7 +413,7 @@ contract RecoveryController is ERC20, Owned {
 
     /**
      * @notice Returns the current maximum amount of Recovery Tokens that can be redeemed for Underlying Tokens.
-     * @param owner_ The owner of the wrapped Recovery Tokens.
+     * @param owner_ The owner of the Staked Recovery Tokens.
      */
     function maxRedeemable(address owner_) public view returns (uint256 redeemable) {
         // Calculate the redeemable underlying tokens since the last redemption.
@@ -438,7 +428,7 @@ contract RecoveryController is ERC20, Owned {
 
     /**
      * @notice Returns the amount of Recovery Tokens that can be redeemed for Underlying Tokens without taking into account restrictions.
-     * @param owner_ The owner of the wrapped Recovery Tokens.
+     * @param owner_ The owner of the Staked Recovery Tokens.
      */
     function previewRedeemable(address owner_) public view returns (uint256 redeemable) {
         // Calculate the redeemable underlying tokens since the last redemption.
@@ -485,7 +475,7 @@ contract RecoveryController is ERC20, Owned {
     }
 
     /**
-     * @notice Calculates and updates the growth of Underlying Tokens redeemed per Wrapped Recovery Token.
+     * @notice Calculates and updates the growth of Underlying Tokens redeemed per Staked Recovery Token.
      * @param amount The amount of redeemed Underlying Tokens.
      */
     function _distributeUnderlying(uint256 amount) internal {
@@ -499,7 +489,7 @@ contract RecoveryController is ERC20, Owned {
     /**
      * @notice Starts the termination process.
      * @dev The termination process is a two step process, a fixed 'COOLDOWN_PERIOD' should pass between initiation and finalisation.
-     * @dev during the 'COOLDOWN_PERIOD' all Wrapped Recovery Token Holders should claim their redeemable balances.
+     * @dev during the 'COOLDOWN_PERIOD' all Staked Recovery Token Holders should claim their redeemable balances.
      */
     function initiateTermination() external onlyOwner {
         terminationTimestamp = uint32(block.timestamp);

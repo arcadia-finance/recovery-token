@@ -57,8 +57,8 @@ contract Mint_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test {
         vm.assume(amount <= type(uint256).max - initialBalanceController);
         // And: Balance "to" does not overflow after mint of "amount".
         vm.assume(amount <= type(uint256).max - initialBalanceTo);
-        // And: "to" has "initialBalanceTo" of "wrappedRecoveryToken".
-        deal(address(wrappedRecoveryToken), to, initialBalanceTo);
+        // And: "to" has "initialBalanceTo" of "stakedRecoveryToken".
+        deal(address(stakedRecoveryToken), to, initialBalanceTo);
         // And: "recoveryController" has "initialBalanceController" of "recoveryToken".
         deal(address(recoveryToken), address(recoveryControllerExtension), initialBalanceController);
 
@@ -66,8 +66,8 @@ contract Mint_RecoveryController_Fuzz_Test is RecoveryController_Fuzz_Test {
         vm.prank(users.owner);
         recoveryControllerExtension.mint(to, amount);
 
-        // Then: "wrappedRecoveryToken" balance of "to" should increase with "amount".
-        assertEq(wrappedRecoveryToken.balanceOf(to), initialBalanceTo + amount);
+        // Then: "stakedRecoveryToken" balance of "to" should increase with "amount".
+        assertEq(stakedRecoveryToken.balanceOf(to), initialBalanceTo + amount);
         // And: "recoveryToken" balance of "recoveryController" should increase with "amount".
         assertEq(recoveryToken.balanceOf(address(recoveryControllerExtension)), initialBalanceController + amount);
     }

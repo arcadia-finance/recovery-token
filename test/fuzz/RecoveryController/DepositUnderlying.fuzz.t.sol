@@ -41,9 +41,9 @@ contract DepositUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fu
         recoveryControllerExtension.setActive(true);
 
         // When: A "depositor" deposits "amount" of "underlyingToken".
-        // Then: The transaction reverts with "DepositAmountZero".
+        // Then: The transaction reverts with "ZeroAmount".
         vm.prank(depositor);
-        vm.expectRevert(DepositAmountZero.selector);
+        vm.expectRevert(ZeroAmount.selector);
         recoveryControllerExtension.depositUnderlying(0);
     }
 
@@ -60,7 +60,7 @@ contract DepositUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fu
         vm.assume(amount > 0);
 
         // And: There are no open positions on the "recoveryController".
-        controller.supplyWRT = 0;
+        controller.supplySRT = 0;
 
         // And: state is persisted.
         setUserState(user);
@@ -92,8 +92,8 @@ contract DepositUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fu
         // And: The protocol is active with a random valid state.
         (user, controller) = givenValidActiveState(user, controller);
 
-        // And: "controller.supplyWRT" is non-zero.
-        vm.assume(controller.supplyWRT > 0);
+        // And: "controller.supplySRT" is non-zero.
+        vm.assume(controller.supplySRT > 0);
 
         // And: Balance "controller.supplyUT" does not overflow (ERC20 Invariant).
         vm.assume(controller.balanceUT < type(uint256).max);
@@ -101,13 +101,13 @@ contract DepositUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fu
 
         // And: Assume "delta" does not overflow (unrealistic big numbers).
         amount = bound(amount, 1, type(uint256).max / 1e18);
-        uint256 delta = amount * 1e18 / controller.supplyWRT;
+        uint256 delta = amount * 1e18 / controller.supplySRT;
         // And: Assume "redeemablePerRTokenGlobal" does not overflow (unrealistic big numbers).
         vm.assume(controller.redeemablePerRTokenGlobal <= type(uint256).max - delta);
         // And: "redeemable" does not overflow (unrealistic big numbers).
         uint256 userDelta = controller.redeemablePerRTokenGlobal + delta - user.redeemablePerRTokenLast;
         if (userDelta > 0) {
-            vm.assume(user.balanceWRT <= type(uint256).max / userDelta);
+            vm.assume(user.balanceSRT <= type(uint256).max / userDelta);
         }
 
         // And: State is persisted.
@@ -132,18 +132,18 @@ contract DepositUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fu
         // No direct function on the contract -> calculate actualTotalRedeemable of last deposit.
         uint256 actualTotalRedeemable = recoveryControllerExtension.totalSupply()
             * (recoveryControllerExtension.redeemablePerRTokenGlobal() - controller.redeemablePerRTokenGlobal) / 1e18;
-        uint256 maxRoundingError = controller.supplyWRT / 1e18 + 1;
+        uint256 maxRoundingError = controller.supplySRT / 1e18 + 1;
         assertApproxEqAbs(actualTotalRedeemable, amount, maxRoundingError);
 
         // And: A proportional share of "amount" is redeemable by "user".
         uint256 actualUserRedeemable = recoveryControllerExtension.previewRedeemable(user.addr) - userRedeemableLast;
         // ToDo: use Full Math library proper MulDiv.
-        if (user.balanceWRT != 0) vm.assume(amount <= type(uint256).max / user.balanceWRT);
+        if (user.balanceSRT != 0) vm.assume(amount <= type(uint256).max / user.balanceSRT);
         // For the lower bound we start from the lowerBound of the total deposited amount and calculate the relative share rounded down.
         uint256 lowerBoundTotal = maxRoundingError < amount ? amount - maxRoundingError : 0;
-        uint256 lowerBoundUser = lowerBoundTotal.mulDivDown(user.balanceWRT, controller.supplyWRT);
+        uint256 lowerBoundUser = lowerBoundTotal.mulDivDown(user.balanceSRT, controller.supplySRT);
         // For the upper bound we start from the full amount of the total deposited amount and calculate the relative share rounded up.
-        uint256 upperBoundUser = amount.mulDivUp(user.balanceWRT, controller.supplyWRT);
+        uint256 upperBoundUser = amount.mulDivUp(user.balanceSRT, controller.supplySRT);
         assertLe(lowerBoundUser, actualUserRedeemable);
         assertLe(actualUserRedeemable, upperBoundUser);
     }
