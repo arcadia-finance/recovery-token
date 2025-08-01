@@ -2,11 +2,10 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {Invariant_Test} from "./Invariant.t.sol";
-
-import {InactiveRecoveryControllerHandler} from "./handlers/InactiveRecoveryControllerHandler.sol";
+import { InactiveRecoveryControllerHandler } from "./handlers/InactiveRecoveryControllerHandler.sol";
+import { Invariant_Test } from "./Invariant.t.sol";
 
 /**
  * @notice Invariant tests for when the "RecoveryController" is not activated.

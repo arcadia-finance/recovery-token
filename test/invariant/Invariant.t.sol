@@ -2,13 +2,11 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {Base_Test} from "../Base.t.sol";
-
-import {StdInvariant} from "../../lib/forge-std/src/StdInvariant.sol";
-
-import {SharedHandlerState} from "./SharedHandlerState.sol";
+import { Base_Test } from "../Base.t.sol";
+import { SharedHandlerState } from "./SharedHandlerState.sol";
+import { StdInvariant } from "../../lib/forge-std/src/StdInvariant.sol";
 
 /**
  * @notice Common logic needed by all invariant tests.

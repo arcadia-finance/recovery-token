@@ -2,11 +2,10 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {Fuzz_Test} from "../Fuzz.t.sol";
-
-import {RecoveryTokenExtension} from "../../utils/Extensions.sol";
+import { Fuzz_Test } from "../Fuzz.t.sol";
+import { RecoveryTokenExtension } from "../../utils/Extensions.sol";
 
 /**
  * @notice Common logic needed by all "RecoveryToken" fuzz tests.
@@ -33,6 +32,6 @@ abstract contract RecoveryToken_Fuzz_Test is Fuzz_Test {
         recoveryTokenExtension = new RecoveryTokenExtension(address(recoveryController), underlyingToken.decimals());
 
         // Label the contract.
-        vm.label({account: address(recoveryToken), newLabel: "RecoveryToken"});
+        vm.label({ account: address(recoveryToken), newLabel: "RecoveryToken" });
     }
 }

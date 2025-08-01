@@ -2,14 +2,12 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {RecoveryControllerHandler, SharedHandlerState} from "./RecoveryControllerHandler.sol";
-
-import {ERC20} from "../../../lib/solmate/src/tokens/ERC20.sol";
-
-import {RecoveryController} from "../../../src/RecoveryController.sol";
-import {RecoveryToken} from "../../../src/RecoveryToken.sol";
+import { ERC20 } from "../../../lib/solmate/src/tokens/ERC20.sol";
+import { RecoveryController } from "../../../src/RecoveryController.sol";
+import { RecoveryControllerHandler, SharedHandlerState } from "./RecoveryControllerHandler.sol";
+import { RecoveryToken } from "../../../src/RecoveryToken.sol";
 
 /**
  * @notice Handler for "RecoveryController" when it is not activated.
@@ -38,7 +36,7 @@ contract InactiveRecoveryControllerHandler is RecoveryControllerHandler {
         ERC20 underlyingToken_,
         RecoveryToken recoveryToken_,
         RecoveryController recoveryController_
-    ) RecoveryControllerHandler(state_, underlyingToken_, recoveryToken_, recoveryController_) {}
+    ) RecoveryControllerHandler(state_, underlyingToken_, recoveryToken_, recoveryController_) { }
 
     /*//////////////////////////////////////////////////////////////////////////
                                     FUNCTIONS

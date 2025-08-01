@@ -2,11 +2,10 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {RecoveryController_Fuzz_Test} from "./_RecoveryController.fuzz.t.sol";
-
-import {StdStorage, stdStorage} from "../../../lib/forge-std/src/Test.sol";
+import { RecoveryController_Fuzz_Test } from "./_RecoveryController.fuzz.t.sol";
+import { StdStorage, stdStorage } from "../../../lib/forge-std/src/Test.sol";
 
 /**
  * @notice Fuzz tests for the function "distributeUnderlying" of "RecoveryController".

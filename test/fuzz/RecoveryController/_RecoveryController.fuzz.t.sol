@@ -2,16 +2,14 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {Fuzz_Test} from "../Fuzz.t.sol";
-
-import {ERC20} from "../../../lib/solmate/src/tokens/ERC20.sol";
-import {StdStorage, stdStorage} from "../../../lib/forge-std/src/Test.sol";
-
-import {RecoveryControllerExtension} from "../../utils/Extensions.sol";
-import {RecoveryToken} from "../../../src/RecoveryToken.sol";
-import {UserState, ControllerState} from "../../utils/Types.sol";
+import { ControllerState, UserState } from "../../utils/Types.sol";
+import { ERC20 } from "../../../lib/solmate/src/tokens/ERC20.sol";
+import { Fuzz_Test } from "../Fuzz.t.sol";
+import { RecoveryControllerExtension } from "../../utils/Extensions.sol";
+import { RecoveryToken } from "../../../src/RecoveryToken.sol";
+import { StdStorage, stdStorage } from "../../../lib/forge-std/src/Test.sol";
 
 /**
  * @notice Common logic needed by all "RecoveryController" fuzz tests.
@@ -39,12 +37,12 @@ abstract contract RecoveryController_Fuzz_Test is Fuzz_Test {
         // Deploy Recovery contracts.
         vm.prank(users.creator);
         recoveryControllerExtension = new RecoveryControllerExtension(address(underlyingToken));
-        recoveryToken = RecoveryToken(recoveryControllerExtension.recoveryToken());
+        recoveryToken = RecoveryToken(recoveryControllerExtension.RECOVERY_TOKEN());
         wrappedRecoveryToken = ERC20(address(recoveryControllerExtension));
 
         // Label the contracts.
-        vm.label({account: address(recoveryToken), newLabel: "RecoveryToken"});
-        vm.label({account: address(recoveryControllerExtension), newLabel: "RecoveryController"});
+        vm.label({ account: address(recoveryToken), newLabel: "RecoveryToken" });
+        vm.label({ account: address(recoveryControllerExtension), newLabel: "RecoveryController" });
     }
 
     /* ///////////////////////////////////////////////////////////////

@@ -2,10 +2,10 @@
  * Created by Pragma Labs
  * SPDX-License-Identifier: MIT
  */
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import {ERC20} from "../lib/solmate/src/tokens/ERC20.sol";
-import {IRecoveryToken} from "./interfaces/IRecoveryToken.sol";
+import { ERC20 } from "../lib/solmate/src/tokens/ERC20.sol";
+import { IRecoveryToken } from "./interfaces/IRecoveryToken.sol";
 
 /**
  * @title Arcadia Recovery Tokens.
