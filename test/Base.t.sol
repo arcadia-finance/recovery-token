@@ -6,7 +6,7 @@ pragma solidity 0.8.19;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 
-import {ERC20, USDCMock} from "./mocks/USDCMock.sol";
+import {ERC20, ERC20Mock} from "./mocks/ERC20Mock.sol";
 import {Errors} from "./utils/Errors.sol";
 import {Events} from "./utils/Events.sol";
 import {RecoveryController} from "../src/RecoveryController.sol";
@@ -65,7 +65,7 @@ abstract contract Base_Test is Test, Errors, Events, Utils {
     function deployUnderlyingAsset() internal {
         // Deploy mocked Underlying Asset.
         vm.prank(users.tokenCreator);
-        underlyingToken = new USDCMock("Mocked Underlying Token","MUT",8);
+        underlyingToken = new ERC20Mock("Mocked Underlying Token", "MUT", 8);
 
         // Label the contract.
         vm.label({account: address(underlyingToken), newLabel: "UnderlyingToken"});
