@@ -5,7 +5,7 @@
 pragma solidity 0.8.30;
 
 import { Fuzz_Test } from "../Fuzz.t.sol";
-import { RecoveryTokenExtension } from "../../utils/Extensions.sol";
+import { RecoveryTokenExtension } from "../../utils/extensions/RecoveryTokenExtension.sol";
 
 /**
  * @notice Common logic needed by all "RecoveryToken" fuzz tests.

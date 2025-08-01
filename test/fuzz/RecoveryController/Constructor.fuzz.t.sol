@@ -5,7 +5,7 @@
 pragma solidity 0.8.30;
 
 import { RecoveryController_Fuzz_Test } from "./_RecoveryController.fuzz.t.sol";
-import { RecoveryControllerExtension } from "../../utils/Extensions.sol";
+import { RecoveryControllerExtension } from "../../utils/extensions/RecoveryControllerExtension.sol";
 
 /**
  * @notice Fuzz tests for the "constructor" of "RecoveryController".
