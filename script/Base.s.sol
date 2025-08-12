@@ -5,9 +5,9 @@
 pragma solidity ^0.8.30;
 
 import { Arcadia } from "./utils/Constants.sol";
-import { Redeemer } from "../src/Redeemer.sol";
 import { RecoveryController } from "../src/RecoveryController.sol";
 import { RecoveryToken } from "../src/RecoveryToken.sol";
+import { Redeemer } from "../src/Redeemer.sol";
 import { SafeTransactionBuilder } from "./utils/SafeTransactionBuilder.sol";
 import { Test } from "../lib/forge-std/src/Test.sol";
 
