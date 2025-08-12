@@ -6,6 +6,7 @@ pragma solidity 0.8.30;
 
 import { ControllerState, UserState } from "../../utils/Types.sol";
 import { RecoveryController_Fuzz_Test } from "./_RecoveryController.fuzz.t.sol";
+import { RecoveryController } from "../../../src/RecoveryController.sol";
 
 /**
  * @notice Fuzz tests for the function "redeemUnderlying" of "RecoveryController".
@@ -53,6 +54,10 @@ contract RedeemUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fuz
 
         // When: "caller" calls "redeemUnderlying" for "user".
         vm.prank(caller);
+        if (redeemable > 0) {
+            vm.expectEmit(address(recoveryControllerExtension));
+            emit RecoveryController.Redeemed(user.addr, redeemable);
+        }
         recoveryControllerExtension.redeemUnderlying(user.addr);
 
         // Then: "user" state variables are updated.
@@ -95,6 +100,10 @@ contract RedeemUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fuz
 
         // When: "caller" calls "redeemUnderlying" for "user".
         vm.prank(caller);
+        if (openPosition > 0) {
+            vm.expectEmit(address(recoveryControllerExtension));
+            emit RecoveryController.Redeemed(user.addr, openPosition);
+        }
         recoveryControllerExtension.redeemUnderlying(user.addr);
 
         // Then: "user" position is closed.
@@ -146,6 +155,10 @@ contract RedeemUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fuz
 
         // When: "caller" calls "redeemUnderlying" for "user".
         vm.prank(caller);
+        if (openPosition > 0) {
+            vm.expectEmit(address(recoveryControllerExtension));
+            emit RecoveryController.Redeemed(user.addr, openPosition);
+        }
         recoveryControllerExtension.redeemUnderlying(user.addr);
 
         // Then: "user" position is closed.

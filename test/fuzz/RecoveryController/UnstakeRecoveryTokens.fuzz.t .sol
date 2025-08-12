@@ -6,6 +6,7 @@ pragma solidity 0.8.30;
 
 import { ControllerState, UserState } from "../../utils/Types.sol";
 import { RecoveryController_Fuzz_Test } from "./_RecoveryController.fuzz.t.sol";
+import { RecoveryController } from "../../../src/RecoveryController.sol";
 
 /**
  * @notice Fuzz tests for the function "unstakeRecoveryTokens" of "RecoveryController".
@@ -70,6 +71,10 @@ contract UnstakeRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControlle
 
         // When: "user" calls "unstakeRecoveryTokens".
         vm.prank(user.addr);
+        if (redeemable > 0) {
+            vm.expectEmit(address(recoveryControllerExtension));
+            emit RecoveryController.Redeemed(user.addr, redeemable);
+        }
         recoveryControllerExtension.unstakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
@@ -119,6 +124,10 @@ contract UnstakeRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControlle
 
         // When: "user" calls "unstakeRecoveryTokens".
         vm.prank(user.addr);
+        if (redeemable > 0) {
+            vm.expectEmit(address(recoveryControllerExtension));
+            emit RecoveryController.Redeemed(user.addr, redeemable);
+        }
         recoveryControllerExtension.unstakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
@@ -168,6 +177,10 @@ contract UnstakeRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControlle
 
         // When: "user" calls "unstakeRecoveryTokens".
         vm.prank(user.addr);
+        if (redeemable > 0) {
+            vm.expectEmit(address(recoveryControllerExtension));
+            emit RecoveryController.Redeemed(user.addr, redeemable);
+        }
         recoveryControllerExtension.unstakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
@@ -219,6 +232,10 @@ contract UnstakeRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControlle
 
         // When: "user" calls "unstakeRecoveryTokens".
         vm.prank(user.addr);
+        if (openPosition > 0) {
+            vm.expectEmit(address(recoveryControllerExtension));
+            emit RecoveryController.Redeemed(user.addr, openPosition);
+        }
         recoveryControllerExtension.unstakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
@@ -277,6 +294,10 @@ contract UnstakeRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryControlle
 
         // When: "user" calls "unstakeRecoveryTokens".
         vm.prank(user.addr);
+        if (openPosition > 0) {
+            vm.expectEmit(address(recoveryControllerExtension));
+            emit RecoveryController.Redeemed(user.addr, openPosition);
+        }
         recoveryControllerExtension.unstakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
