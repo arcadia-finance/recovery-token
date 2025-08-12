@@ -5,6 +5,7 @@
 pragma solidity 0.8.30;
 
 import { ControllerState, UserState } from "../../utils/Types.sol";
+import { RecoveryController } from "../../../src/RecoveryController.sol";
 import { RecoveryController_Fuzz_Test } from "./_RecoveryController.fuzz.t.sol";
 import { stdError } from "../../../lib/forge-std/src/StdError.sol";
 
@@ -135,6 +136,10 @@ contract StakeRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryController_
 
         // When: "user" calls "recoveryToken".
         vm.prank(user.addr);
+        if (redeemable > 0) {
+            vm.expectEmit(address(recoveryControllerExtension));
+            emit RecoveryController.Redeemed(user.addr, redeemable);
+        }
         recoveryControllerExtension.stakeRecoveryTokens(amount);
 
         // Then: "user" state variables are updated.
@@ -196,6 +201,8 @@ contract StakeRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryController_
 
         // When: "user" calls "recoveryToken".
         vm.prank(user.addr);
+        vm.expectEmit(address(recoveryControllerExtension));
+        emit RecoveryController.Redeemed(user.addr, openPosition + amount);
         recoveryControllerExtension.stakeRecoveryTokens(amount);
 
         // Then: "user" position is closed.
@@ -263,6 +270,8 @@ contract StakeRecoveryTokens_RecoveryController_Fuzz_Test is RecoveryController_
 
         // When: "user" calls "recoveryToken".
         vm.prank(user.addr);
+        vm.expectEmit(address(recoveryControllerExtension));
+        emit RecoveryController.Redeemed(user.addr, openPosition + amount);
         recoveryControllerExtension.stakeRecoveryTokens(amount);
 
         // Then: "user" position is closed.

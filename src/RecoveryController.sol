@@ -64,6 +64,13 @@ contract RecoveryController is ERC20, Owned {
     event ActivationSet(bool active);
 
     /**
+     * @notice Emitted when Recovery Tokens are redeemed.
+     * @param user The address of the user who redeemed Recovery Tokens.
+     * @param amount The amount of Recovery Tokens redeemed.
+     */
+    event Redeemed(address indexed user, uint256 amount);
+
+    /**
      * @notice Emitted when the termination of the Controller is initiated.
      */
     event TerminationInitiated();
@@ -324,7 +331,7 @@ contract RecoveryController is ERC20, Owned {
         }
 
         // Reentrancy: Transfer the Underlying Tokens after logic.
-        _redeemUnderlying(owner_, redeemable);
+        if (redeemable > 0) _redeemUnderlying(owner_, redeemable);
     }
 
     /**
@@ -372,7 +379,7 @@ contract RecoveryController is ERC20, Owned {
         }
 
         // Reentrancy: Transfer the Underlying Tokens after logic.
-        _redeemUnderlying(msg.sender, redeemable);
+        if (redeemable > 0) _redeemUnderlying(msg.sender, redeemable);
     }
 
     /**
@@ -423,7 +430,7 @@ contract RecoveryController is ERC20, Owned {
         }
 
         // Reentrancy: Transfer the Underlying Tokens after logic.
-        _redeemUnderlying(msg.sender, redeemable);
+        if (redeemable > 0) _redeemUnderlying(msg.sender, redeemable);
     }
 
     /**
@@ -472,6 +479,8 @@ contract RecoveryController is ERC20, Owned {
         // Send equal amount of underlying assets.
         // Reentrancy: Transfer the Underlying Tokens after logic.
         UNDERLYING_TOKEN.safeTransfer(to, amount);
+
+        emit Redeemed(to, amount);
     }
 
     /**
