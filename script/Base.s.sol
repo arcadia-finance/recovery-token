@@ -14,7 +14,7 @@ import { Test } from "../lib/forge-std/src/Test.sol";
 abstract contract Base_Script is Test, SafeTransactionBuilder {
     uint256 internal deployer = vm.envUint("PRIVATE_KEY_DEPLOYER");
 
-    Redeemer internal redeemer = Redeemer(Arcadia.REDEEMER);
     RecoveryController internal recoveryController = RecoveryController(Arcadia.RECOVERY_CONTROLLER);
     RecoveryToken internal recoveryToken = RecoveryToken(Arcadia.RECOVERY_TOKEN);
+    Redeemer internal redeemer = Redeemer(Arcadia.REDEEMER);
 }

@@ -45,8 +45,8 @@ contract Redeemer is Owned {
                                 EVENTS
     ////////////////////////////////////////////////////////////// */
 
-    event Redeemed(bytes32 indexed root, address indexed user, uint256 amount);
     event MerkleRootSet(bytes32 indexed merkleRoot);
+    event Redeemed(bytes32 indexed root, address indexed user, uint256 amount);
     event TreasurySet(address indexed treasury);
 
     /*//////////////////////////////////////////////////////////////
