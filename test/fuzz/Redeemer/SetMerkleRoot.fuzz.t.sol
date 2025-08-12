@@ -4,45 +4,45 @@
  */
 pragma solidity ^0.8.22;
 
-import { FeeClaimer } from "../../../src/FeeClaimer.sol";
-import { FeeClaimer_Fuzz_Test } from "./_FeeClaimer.fuzz.t.sol";
+import { Redeemer } from "../../../src/Redeemer.sol";
+import { Redeemer_Fuzz_Test } from "./_Redeemer.fuzz.t.sol";
 
 /**
- * @notice Fuzz tests for the function "setTreasury" of contract "FeeClaimer".
+ * @notice Fuzz tests for the function "setMerkleRoot" of contract "Redeemer".
  */
-contract SetTreasury_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
+contract SetMerkleRoot_Redeemer_Fuzz_Test is Redeemer_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                               SETUP
     /////////////////////////////////////////////////////////////// */
 
     function setUp() public virtual override {
-        FeeClaimer_Fuzz_Test.setUp();
+        Redeemer_Fuzz_Test.setUp();
     }
 
     /*//////////////////////////////////////////////////////////////
                               TESTS
     //////////////////////////////////////////////////////////////*/
-    function testFuzz_Revert_SetMerkleRoot_OnlyOwner(address caller, address newTreasury) public {
+    function testFuzz_Revert_SetMerkleRoot_OnlyOwner(address caller, bytes32 newMerkleRoot) public {
         // Given: Caller is not the "owner".
         vm.assume(caller != users.owner);
 
-        // When: Caller calls "setTreasury".
+        // When: Caller calls "setMerkleRoot".
         // Then: Transaction should revert with "UNAUTHORIZED".
         vm.prank(caller);
         vm.expectRevert("UNAUTHORIZED");
-        feeClaimer.setTreasury(newTreasury);
+        redeemer.setMerkleRoot(newMerkleRoot);
     }
 
-    function testFuzz_Success_SetMerkleRoot(address newTreasury) public {
+    function testFuzz_Success_SetMerkleRoot(bytes32 newMerkleRoot) public {
         // Given: Caller is the "owner".
-        // When: Caller calls "setTreasury".
+        // When: Caller calls "setMerkleRoot".
         // Then: correct event is emitted.
         vm.prank(users.owner);
-        vm.expectEmit(address(feeClaimer));
-        emit FeeClaimer.TreasurySet(newTreasury);
-        feeClaimer.setTreasury(newTreasury);
+        vm.expectEmit(address(redeemer));
+        emit Redeemer.MerkleRootSet(newMerkleRoot);
+        redeemer.setMerkleRoot(newMerkleRoot);
 
         // And: New merkle root is set.
-        assertEq(feeClaimer.treasury(), newTreasury);
+        assertEq(redeemer.merkleRoot(), newMerkleRoot);
     }
 }

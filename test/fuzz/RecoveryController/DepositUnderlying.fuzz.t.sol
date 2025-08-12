@@ -128,7 +128,7 @@ contract DepositUnderlying_RecoveryController_Fuzz_Test is RecoveryController_Fu
         assertEq(recoveryControllerExtension.redeemablePerRTokenGlobal(), controller.redeemablePerRTokenGlobal + delta);
         assertEq(underlyingToken.balanceOf(address(recoveryControllerExtension)), controller.balanceUT + amount);
 
-        // And: The total amount deposited (minus rounding error) is claimable by all rToken Holders.
+        // And: The total amount deposited (minus rounding error) is redeemable by all rToken Holders.
         // No direct function on the contract -> calculate actualTotalRedeemable of last deposit.
         uint256 actualTotalRedeemable = recoveryControllerExtension.totalSupply()
             * (recoveryControllerExtension.redeemablePerRTokenGlobal() - controller.redeemablePerRTokenGlobal) / 1e18;

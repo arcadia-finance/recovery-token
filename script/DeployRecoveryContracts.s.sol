@@ -4,8 +4,8 @@
  */
 pragma solidity 0.8.30;
 
-import { Claimer, Assets, Deployers, Safes } from "./utils/Constants.sol";
-import { FeeClaimer } from "../src/FeeClaimer.sol";
+import { Assets, Deployers, FeeRedeemer, Safes } from "./utils/Constants.sol";
+import { Redeemer } from "../src/Redeemer.sol";
 import { Base_Script } from "./Base.s.sol";
 import { RecoveryController } from "../src/RecoveryController.sol";
 
@@ -17,6 +17,6 @@ contract DeployRecoveryContracts is Base_Script {
         vm.startBroadcast(deployer);
         recoveryController = new RecoveryController(Safes.OWNER, Assets.USDC);
 
-        feeClaimer = new FeeClaimer(Safes.OWNER, address(recoveryController), Claimer.TREASURY);
+        redeemer = new Redeemer(Safes.OWNER, address(recoveryController), FeeRedeemer.TREASURY);
     }
 }

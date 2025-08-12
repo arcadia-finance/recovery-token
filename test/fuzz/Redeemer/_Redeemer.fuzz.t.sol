@@ -5,12 +5,12 @@
 pragma solidity 0.8.30;
 
 import { Fuzz_Test } from "../Fuzz.t.sol";
-import { FeeClaimerExtension } from "../../utils/extensions/FeeClaimerExtension.sol";
+import { RedeemerExtension } from "../../utils/extensions/RedeemerExtension.sol";
 
 /**
- * @notice Common logic needed by all "FeeClaimer" fuzz tests.
+ * @notice Common logic needed by all "Redeemer" fuzz tests.
  */
-abstract contract FeeClaimer_Fuzz_Test is Fuzz_Test {
+abstract contract Redeemer_Fuzz_Test is Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                              VARIABLES
     /////////////////////////////////////////////////////////////// */
@@ -22,8 +22,8 @@ abstract contract FeeClaimer_Fuzz_Test is Fuzz_Test {
 
     struct UserState {
         address user;
-        uint64 maxClaimable;
-        uint64 claimed;
+        uint64 maxRedeemable;
+        uint64 redeemed;
         uint64 amount;
         uint64 balanceRT;
         bytes32 proof;
@@ -33,7 +33,7 @@ abstract contract FeeClaimer_Fuzz_Test is Fuzz_Test {
                             TEST CONTRACTS
     /////////////////////////////////////////////////////////////// */
 
-    FeeClaimerExtension internal feeClaimer;
+    RedeemerExtension internal redeemer;
 
     /* ///////////////////////////////////////////////////////////////
                               SETUP
@@ -45,9 +45,9 @@ abstract contract FeeClaimer_Fuzz_Test is Fuzz_Test {
         // Deploy Recovery contracts.
         deployRecoveryContracts();
 
-        // Deploy FeeClaimer.
+        // Deploy Redeemer.
         vm.prank(users.creator);
-        feeClaimer = new FeeClaimerExtension(users.owner, address(recoveryController), users.treasury);
+        redeemer = new RedeemerExtension(users.owner, address(recoveryController), users.treasury);
     }
 
     /* ///////////////////////////////////////////////////////////////
@@ -55,7 +55,7 @@ abstract contract FeeClaimer_Fuzz_Test is Fuzz_Test {
     /////////////////////////////////////////////////////////////// */
 
     function getMerkleRoot(UserState memory userState) internal pure returns (bytes32 root) {
-        bytes32 leaf = keccak256(abi.encodePacked(userState.user, uint256(userState.maxClaimable)));
+        bytes32 leaf = keccak256(abi.encodePacked(userState.user, uint256(userState.maxRedeemable)));
         root = commutativeKeccak256(leaf, userState.proof);
     }
 
@@ -73,26 +73,26 @@ abstract contract FeeClaimer_Fuzz_Test is Fuzz_Test {
 
     function givenValidState(GlobalState memory globalState, UserState memory userState) internal view {
         vm.assume(userState.user != users.treasury);
-        vm.assume(userState.user != address(feeClaimer));
+        vm.assume(userState.user != address(redeemer));
 
         userState.amount = uint64(bound(userState.amount, 1, type(uint64).max));
-        userState.maxClaimable = uint64(bound(userState.maxClaimable, 1, type(uint64).max));
-        userState.claimed = uint64(bound(userState.claimed, 0, userState.maxClaimable - 1));
-        uint256 claimable = userState.maxClaimable - userState.claimed;
+        userState.maxRedeemable = uint64(bound(userState.maxRedeemable, 1, type(uint64).max));
+        userState.redeemed = uint64(bound(userState.redeemed, 0, userState.maxRedeemable - 1));
+        uint256 redeemable = userState.maxRedeemable - userState.redeemed;
         userState.balanceRT = uint64(
-            bound(userState.balanceRT, claimable < userState.amount ? claimable : userState.amount, type(uint64).max)
+            bound(userState.balanceRT, redeemable < userState.amount ? redeemable : userState.amount, type(uint64).max)
         );
 
-        globalState.balanceUT = uint64(bound(globalState.balanceUT, claimable, type(uint64).max));
+        globalState.balanceUT = uint64(bound(globalState.balanceUT, redeemable, type(uint64).max));
         globalState.root = getMerkleRoot(userState);
     }
 
     function setState(GlobalState memory globalState, UserState memory userState) internal {
         vm.prank(users.owner);
-        feeClaimer.setMerkleRoot(globalState.root);
+        redeemer.setMerkleRoot(globalState.root);
         deal(address(underlyingToken), users.treasury, globalState.balanceUT);
 
-        feeClaimer.setClaimed(globalState.root, userState.user, userState.claimed);
+        redeemer.setRedeemed(globalState.root, userState.user, userState.redeemed);
         deal(address(recoveryToken), userState.user, userState.balanceRT);
     }
 }
