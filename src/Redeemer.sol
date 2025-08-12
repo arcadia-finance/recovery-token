@@ -38,6 +38,9 @@ contract Redeemer is Owned {
     // The contract address of the treasury, holding the underlying tokens.
     address public treasury;
 
+    // A mapping to track past merkle roots.
+    mapping(bytes32 root => bool) public isRoot;
+
     // A mapping to track per merkle root which users has redeemed how much.
     mapping(bytes32 root => mapping(address user => uint256 amount)) public redeemed;
 
@@ -55,6 +58,7 @@ contract Redeemer is Owned {
 
     error AlreadyRedeemed();
     error InvalidProof();
+    error InvalidRoot();
     error ZeroAmount();
 
     /*//////////////////////////////////////////////////////////////
@@ -82,6 +86,9 @@ contract Redeemer is Owned {
      * @param merkleRoot_ The new root of the Merkle tree.
      */
     function setMerkleRoot(bytes32 merkleRoot_) external onlyOwner {
+        if (isRoot[merkleRoot_]) revert InvalidRoot();
+        isRoot[merkleRoot_] = true;
+
         emit MerkleRootSet(merkleRoot = merkleRoot_);
     }
 
