@@ -4,25 +4,25 @@
  */
 pragma solidity ^0.8.22;
 
-import { FeeClaimer } from "../../../src/FeeClaimer.sol";
-import { FeeClaimer_Fuzz_Test } from "./_FeeClaimer.fuzz.t.sol";
+import { Redeemer } from "../../../src/Redeemer.sol";
+import { Redeemer_Fuzz_Test } from "./_Redeemer.fuzz.t.sol";
 
 /**
- * @notice Fuzz tests for the function "claim" of contract "FeeClaimer".
+ * @notice Fuzz tests for the function "redeem" of contract "Redeemer".
  */
-contract Claim_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
+contract Redeem_Redeemer_Fuzz_Test is Redeemer_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                               SETUP
     /////////////////////////////////////////////////////////////// */
 
     function setUp() public virtual override {
-        FeeClaimer_Fuzz_Test.setUp();
+        Redeemer_Fuzz_Test.setUp();
     }
 
     /*//////////////////////////////////////////////////////////////
                               TESTS
     //////////////////////////////////////////////////////////////*/
-    function testFuzz_Revert_claim_ZeroAmount(
+    function testFuzz_Revert_redeem_ZeroAmount(
         GlobalState memory globalState,
         UserState memory userState,
         address invalidCaller
@@ -36,16 +36,16 @@ contract Claim_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "claim".
+        // When: Caller calls "redeem".
         // Then: The transaction should revert with "InvalidProof".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(invalidCaller);
-        vm.expectRevert(FeeClaimer.ZeroAmount.selector);
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        vm.expectRevert(Redeemer.ZeroAmount.selector);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
     }
 
-    function testFuzz_Revert_claim_InvalidCaller(
+    function testFuzz_Revert_redeem_InvalidCaller(
         GlobalState memory globalState,
         UserState memory userState,
         address invalidCaller
@@ -59,40 +59,40 @@ contract Claim_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "claim".
+        // When: Caller calls "redeem".
         // Then: The transaction should revert with "InvalidProof".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(invalidCaller);
-        vm.expectRevert(FeeClaimer.InvalidProof.selector);
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        vm.expectRevert(Redeemer.InvalidProof.selector);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
     }
 
-    function testFuzz_Revert_claim_InvalidMaxClaimable(
+    function testFuzz_Revert_redeem_InvalidMaxRedeemable(
         GlobalState memory globalState,
         UserState memory userState,
-        uint64 invalidMaxClaimable
+        uint64 invalidMaxRedeemable
     ) public {
         // Given: Valid state.
         givenValidState(globalState, userState);
 
-        // And: maxClaimable is not valid.
-        vm.assume(userState.maxClaimable != invalidMaxClaimable);
-        userState.maxClaimable = invalidMaxClaimable;
+        // And: maxRedeemable is not valid.
+        vm.assume(userState.maxRedeemable != invalidMaxRedeemable);
+        userState.maxRedeemable = invalidMaxRedeemable;
 
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "claim".
+        // When: Caller calls "redeem".
         // Then: The transaction should revert with "InvalidProof".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(userState.user);
-        vm.expectRevert(FeeClaimer.InvalidProof.selector);
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        vm.expectRevert(Redeemer.InvalidProof.selector);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
     }
 
-    function testFuzz_Revert_claim_InvalidProof(
+    function testFuzz_Revert_redeem_InvalidProof(
         GlobalState memory globalState,
         UserState memory userState,
         bytes32 invalidProof
@@ -107,16 +107,16 @@ contract Claim_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "claim".
+        // When: Caller calls "redeem".
         // Then: The transaction should revert with "InvalidProof".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(userState.user);
-        vm.expectRevert(FeeClaimer.InvalidProof.selector);
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        vm.expectRevert(Redeemer.InvalidProof.selector);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
     }
 
-    function testFuzz_Revert_claim_InvalidRoot(
+    function testFuzz_Revert_redeem_InvalidRoot(
         GlobalState memory globalState,
         UserState memory userState,
         bytes32 invalidRoot
@@ -131,35 +131,37 @@ contract Claim_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "claim".
+        // When: Caller calls "redeem".
         // Then: The transaction should revert with "InvalidProof".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(userState.user);
-        vm.expectRevert(FeeClaimer.InvalidProof.selector);
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        vm.expectRevert(Redeemer.InvalidProof.selector);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
     }
 
-    function testFuzz_Revert_claim_AlreadyClaimed(GlobalState memory globalState, UserState memory userState) public {
+    function testFuzz_Revert_redeem_AlreadyRedeemed(GlobalState memory globalState, UserState memory userState)
+        public
+    {
         // Given: Valid state.
         givenValidState(globalState, userState);
 
-        // And: User has already claimed max amount.
-        userState.claimed = uint64(bound(userState.claimed, userState.maxClaimable, type(uint64).max));
+        // And: User has already redeemed max amount.
+        userState.redeemed = uint64(bound(userState.redeemed, userState.maxRedeemable, type(uint64).max));
 
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "claim".
-        // Then: The transaction should revert with "AlreadyClaimed".
+        // When: Caller calls "redeem".
+        // Then: The transaction should revert with "AlreadyRedeemed".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(userState.user);
-        vm.expectRevert(FeeClaimer.AlreadyClaimed.selector);
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        vm.expectRevert(Redeemer.AlreadyRedeemed.selector);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
     }
 
-    function testFuzz_Revert_claim_InsufficientApprovalUser(
+    function testFuzz_Revert_redeem_InsufficientApprovalUser(
         GlobalState memory globalState,
         UserState memory userState,
         uint64 approval
@@ -170,32 +172,32 @@ contract Claim_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // And: State is persisted.
         setState(globalState, userState);
 
-        uint256 claimable = userState.maxClaimable - userState.claimed;
-        uint256 amount = userState.amount < claimable ? userState.amount : claimable;
+        uint256 redeemable = userState.maxRedeemable - userState.redeemed;
+        uint256 amount = userState.amount < redeemable ? userState.amount : redeemable;
 
-        // And: user approved the claimable amount.
+        // And: user approved the redeemable amount.
         approval = uint64(bound(approval, 0, amount - 1));
         vm.prank(userState.user);
-        recoveryToken.approve(address(feeClaimer), approval);
+        recoveryToken.approve(address(redeemer), approval);
 
-        // When: Caller calls "claim".
+        // When: Caller calls "redeem".
         // Then: The transaction should revert.
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(userState.user);
         vm.expectRevert("TRANSFER_FROM_FAILED");
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
     }
 
-    function testFuzz_Revert_claim_InsufficientBalanceUser(GlobalState memory globalState, UserState memory userState)
+    function testFuzz_Revert_redeem_InsufficientBalanceUser(GlobalState memory globalState, UserState memory userState)
         public
     {
         // Given: Valid state.
         givenValidState(globalState, userState);
 
         // And: Balance of user is not sufficient.
-        uint256 claimable = userState.maxClaimable - userState.claimed;
-        uint256 amount = userState.amount < claimable ? userState.amount : claimable;
+        uint256 redeemable = userState.maxRedeemable - userState.redeemed;
+        uint256 amount = userState.amount < redeemable ? userState.amount : redeemable;
         userState.balanceRT = uint64(bound(userState.balanceRT, 0, amount - 1));
 
         // And: State is persisted.
@@ -203,18 +205,18 @@ contract Claim_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
 
         // And: user approved the amount.
         vm.prank(userState.user);
-        recoveryToken.approve(address(feeClaimer), amount);
+        recoveryToken.approve(address(redeemer), amount);
 
-        // When: Caller calls "claim".
+        // When: Caller calls "redeem".
         // Then: The transaction should revert.
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(userState.user);
         vm.expectRevert("TRANSFER_FROM_FAILED");
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
     }
 
-    function testFuzz_Revert_claim_InsufficientApprovalTreasury(
+    function testFuzz_Revert_redeem_InsufficientApprovalTreasury(
         GlobalState memory globalState,
         UserState memory userState,
         uint64 approval
@@ -225,28 +227,28 @@ contract Claim_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // And: State is persisted.
         setState(globalState, userState);
 
-        uint256 claimable = userState.maxClaimable - userState.claimed;
-        uint256 amount = userState.amount < claimable ? userState.amount : claimable;
+        uint256 redeemable = userState.maxRedeemable - userState.redeemed;
+        uint256 amount = userState.amount < redeemable ? userState.amount : redeemable;
 
-        // And: user approved the claimable amount.
+        // And: user approved the redeemable amount.
         vm.prank(userState.user);
-        recoveryToken.approve(address(feeClaimer), userState.balanceRT);
+        recoveryToken.approve(address(redeemer), userState.balanceRT);
 
-        // And: treasury did not approve the claimable amount.
+        // And: treasury did not approve the redeemable amount.
         approval = uint64(bound(approval, 0, amount - 1));
         vm.prank(users.treasury);
-        underlyingToken.approve(address(feeClaimer), approval);
+        underlyingToken.approve(address(redeemer), approval);
 
-        // When: Caller calls "claim".
+        // When: Caller calls "redeem".
         // Then: The transaction should revert.
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(userState.user);
         vm.expectRevert("TRANSFER_FROM_FAILED");
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
     }
 
-    function testFuzz_Revert_claim_InsufficientBalanceTreasury(
+    function testFuzz_Revert_redeem_InsufficientBalanceTreasury(
         GlobalState memory globalState,
         UserState memory userState
     ) public {
@@ -254,62 +256,62 @@ contract Claim_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         givenValidState(globalState, userState);
 
         // And: Balance of user is not sufficient.
-        uint256 claimable = userState.maxClaimable - userState.claimed;
-        uint256 amount = userState.amount < claimable ? userState.amount : claimable;
+        uint256 redeemable = userState.maxRedeemable - userState.redeemed;
+        uint256 amount = userState.amount < redeemable ? userState.amount : redeemable;
         globalState.balanceUT = uint64(bound(globalState.balanceUT, 0, amount - 1));
 
         // And: State is persisted.
         setState(globalState, userState);
 
-        // And: user approved the claimable amount.
+        // And: user approved the redeemable amount.
         vm.prank(userState.user);
-        recoveryToken.approve(address(feeClaimer), userState.balanceRT);
+        recoveryToken.approve(address(redeemer), userState.balanceRT);
 
-        // And: treasury approved the claimable amount.
+        // And: treasury approved the redeemable amount.
         vm.prank(users.treasury);
-        underlyingToken.approve(address(feeClaimer), globalState.balanceUT);
+        underlyingToken.approve(address(redeemer), globalState.balanceUT);
 
-        // When: Caller calls "claim".
+        // When: Caller calls "redeem".
         // Then: The transaction should revert.
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(userState.user);
         vm.expectRevert("TRANSFER_FROM_FAILED");
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
     }
 
-    function testFuzz_Success_claim(GlobalState memory globalState, UserState memory userState) public {
+    function testFuzz_Success_redeem(GlobalState memory globalState, UserState memory userState) public {
         // Given: Valid state.
         givenValidState(globalState, userState);
 
         // And: State is persisted.
         setState(globalState, userState);
 
-        // And: treasury approved the claimable amount.
+        // And: treasury approved the redeemable amount.
         vm.prank(users.treasury);
-        underlyingToken.approve(address(feeClaimer), globalState.balanceUT);
+        underlyingToken.approve(address(redeemer), globalState.balanceUT);
 
-        uint256 claimable = userState.maxClaimable - userState.claimed;
-        uint256 amount = userState.amount < claimable ? userState.amount : claimable;
+        uint256 redeemable = userState.maxRedeemable - userState.redeemed;
+        uint256 amount = userState.amount < redeemable ? userState.amount : redeemable;
 
         // And: user approved the amount.
         vm.prank(userState.user);
-        recoveryToken.approve(address(feeClaimer), amount);
+        recoveryToken.approve(address(redeemer), amount);
 
-        // When: Caller calls "claim".
+        // When: Caller calls "redeem".
         // Then: Correct event is emitted.
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(userState.user);
-        vm.expectEmit(address(feeClaimer));
-        emit FeeClaimer.Claimed(globalState.root, userState.user, amount);
-        feeClaimer.claim(userState.amount, userState.maxClaimable, proofs);
+        vm.expectEmit(address(redeemer));
+        emit Redeemer.Redeemed(globalState.root, userState.user, amount);
+        redeemer.redeem(userState.amount, userState.maxRedeemable, proofs);
 
         // And: User's balance of recovery tokens is updated.
         assertEq(recoveryToken.balanceOf(userState.user), userState.balanceRT - amount);
 
-        // And: User's claimed amount is updated.
-        assertEq(feeClaimer.claimed(globalState.root, userState.user), userState.claimed + amount);
+        // And: User's redeemed amount is updated.
+        assertEq(redeemer.redeemed(globalState.root, userState.user), userState.redeemed + amount);
 
         // And: Treasury's balance of underlying tokens is updated.
         assertEq(underlyingToken.balanceOf(users.treasury), globalState.balanceUT - amount);

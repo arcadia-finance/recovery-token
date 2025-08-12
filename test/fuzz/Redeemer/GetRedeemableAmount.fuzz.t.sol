@@ -4,25 +4,25 @@
  */
 pragma solidity ^0.8.22;
 
-import { FeeClaimer } from "../../../src/FeeClaimer.sol";
-import { FeeClaimer_Fuzz_Test } from "./_FeeClaimer.fuzz.t.sol";
+import { Redeemer } from "../../../src/Redeemer.sol";
+import { Redeemer_Fuzz_Test } from "./_Redeemer.fuzz.t.sol";
 
 /**
- * @notice Fuzz tests for the function "getClaimableAmount" of contract "FeeClaimer".
+ * @notice Fuzz tests for the function "getRedeemableAmount" of contract "Redeemer".
  */
-contract GetClaimableAmount_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
+contract GetRedeemableAmount_Redeemer_Fuzz_Test is Redeemer_Fuzz_Test {
     /* ///////////////////////////////////////////////////////////////
                               SETUP
     /////////////////////////////////////////////////////////////// */
 
     function setUp() public virtual override {
-        FeeClaimer_Fuzz_Test.setUp();
+        Redeemer_Fuzz_Test.setUp();
     }
 
     /*//////////////////////////////////////////////////////////////
                               TESTS
     //////////////////////////////////////////////////////////////*/
-    function testFuzz_Success_getClaimableAmount_InvalidUser(
+    function testFuzz_Success_getRedeemableAmount_InvalidUser(
         GlobalState memory globalState,
         UserState memory userState,
         address caller,
@@ -37,47 +37,47 @@ contract GetClaimableAmount_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "getClaimableAmount".
+        // When: Caller calls "getRedeemableAmount".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(caller);
-        (bool isValidProof, uint256 claimable) =
-            feeClaimer.getClaimableAmount(invalidUser, userState.maxClaimable, proofs);
+        (bool isValidProof, uint256 redeemable) =
+            redeemer.getRedeemableAmount(invalidUser, userState.maxRedeemable, proofs);
 
         // Then: The correct values are returned.
         assertFalse(isValidProof);
-        assertEq(claimable, 0);
+        assertEq(redeemable, 0);
     }
 
-    function testFuzz_Revert_getClaimableAmount_InvalidMaxClaimable(
+    function testFuzz_Revert_getRedeemableAmount_InvalidMaxRedeemable(
         GlobalState memory globalState,
         UserState memory userState,
         address caller,
-        uint64 invalidMaxClaimable
+        uint64 invalidMaxRedeemable
     ) public {
         // Given: Valid state.
         givenValidState(globalState, userState);
 
-        // And: maxClaimable is not valid.
-        vm.assume(userState.maxClaimable != invalidMaxClaimable);
-        userState.maxClaimable = invalidMaxClaimable;
+        // And: maxRedeemable is not valid.
+        vm.assume(userState.maxRedeemable != invalidMaxRedeemable);
+        userState.maxRedeemable = invalidMaxRedeemable;
 
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "getClaimableAmount".
+        // When: Caller calls "getRedeemableAmount".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(caller);
-        (bool isValidProof, uint256 claimable) =
-            feeClaimer.getClaimableAmount(userState.user, userState.maxClaimable, proofs);
+        (bool isValidProof, uint256 redeemable) =
+            redeemer.getRedeemableAmount(userState.user, userState.maxRedeemable, proofs);
 
         // Then: The correct values are returned.
         assertFalse(isValidProof);
-        assertEq(claimable, 0);
+        assertEq(redeemable, 0);
     }
 
-    function testFuzz_Revert_getClaimableAmount_InvalidProof(
+    function testFuzz_Revert_getRedeemableAmount_InvalidProof(
         GlobalState memory globalState,
         UserState memory userState,
         address caller,
@@ -93,19 +93,19 @@ contract GetClaimableAmount_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "getClaimableAmount".
+        // When: Caller calls "getRedeemableAmount".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(caller);
-        (bool isValidProof, uint256 claimable) =
-            feeClaimer.getClaimableAmount(userState.user, userState.maxClaimable, proofs);
+        (bool isValidProof, uint256 redeemable) =
+            redeemer.getRedeemableAmount(userState.user, userState.maxRedeemable, proofs);
 
         // Then: The correct values are returned.
         assertFalse(isValidProof);
-        assertEq(claimable, 0);
+        assertEq(redeemable, 0);
     }
 
-    function testFuzz_Revert_getClaimableAmount_InvalidRoot(
+    function testFuzz_Revert_getRedeemableAmount_InvalidRoot(
         GlobalState memory globalState,
         UserState memory userState,
         address caller,
@@ -121,19 +121,19 @@ contract GetClaimableAmount_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "getClaimableAmount".
+        // When: Caller calls "getRedeemableAmount".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(caller);
-        (bool isValidProof, uint256 claimable) =
-            feeClaimer.getClaimableAmount(userState.user, userState.maxClaimable, proofs);
+        (bool isValidProof, uint256 redeemable) =
+            redeemer.getRedeemableAmount(userState.user, userState.maxRedeemable, proofs);
 
         // Then: The correct values are returned.
         assertFalse(isValidProof);
-        assertEq(claimable, 0);
+        assertEq(redeemable, 0);
     }
 
-    function testFuzz_Revert_getClaimableAmount_AlreadyClaimed(
+    function testFuzz_Revert_getRedeemableAmount_AlreadyRedeemed(
         GlobalState memory globalState,
         UserState memory userState,
         address caller
@@ -141,25 +141,25 @@ contract GetClaimableAmount_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // Given: Valid state.
         givenValidState(globalState, userState);
 
-        // And: User has already claimed max amount.
-        userState.claimed = uint64(bound(userState.claimed, userState.maxClaimable, type(uint64).max));
+        // And: User has already redeemed max amount.
+        userState.redeemed = uint64(bound(userState.redeemed, userState.maxRedeemable, type(uint64).max));
 
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "getClaimableAmount".
+        // When: Caller calls "getRedeemableAmount".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(caller);
-        (bool isValidProof, uint256 claimable) =
-            feeClaimer.getClaimableAmount(userState.user, userState.maxClaimable, proofs);
+        (bool isValidProof, uint256 redeemable) =
+            redeemer.getRedeemableAmount(userState.user, userState.maxRedeemable, proofs);
 
         // Then: The correct values are returned.
         assertTrue(isValidProof);
-        assertEq(claimable, 0);
+        assertEq(redeemable, 0);
     }
 
-    function testFuzz_Success_getClaimableAmount_ClaimableAmount(
+    function testFuzz_Success_getRedeemableAmount_RedeemableAmount(
         GlobalState memory globalState,
         UserState memory userState,
         address caller
@@ -170,15 +170,15 @@ contract GetClaimableAmount_FeeClaimer_Fuzz_Test is FeeClaimer_Fuzz_Test {
         // And: State is persisted.
         setState(globalState, userState);
 
-        // When: Caller calls "getClaimableAmount".
+        // When: Caller calls "getRedeemableAmount".
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = userState.proof;
         vm.prank(caller);
-        (bool isValidProof, uint256 claimable) =
-            feeClaimer.getClaimableAmount(userState.user, userState.maxClaimable, proofs);
+        (bool isValidProof, uint256 redeemable) =
+            redeemer.getRedeemableAmount(userState.user, userState.maxRedeemable, proofs);
 
         // Then: The correct values are returned.
         assertTrue(isValidProof);
-        assertEq(claimable, userState.maxClaimable - userState.claimed);
+        assertEq(redeemable, userState.maxRedeemable - userState.redeemed);
     }
 }
