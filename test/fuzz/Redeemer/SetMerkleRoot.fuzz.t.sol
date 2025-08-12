@@ -22,7 +22,7 @@ contract SetMerkleRoot_Redeemer_Fuzz_Test is Redeemer_Fuzz_Test {
     /*//////////////////////////////////////////////////////////////
                               TESTS
     //////////////////////////////////////////////////////////////*/
-    function testFuzz_Revert_SetMerkleRoot_OnlyOwner(address caller, bytes32 newMerkleRoot) public {
+    function testFuzz_Revert_setMerkleRoot_OnlyOwner(address caller, bytes32 newMerkleRoot) public {
         // Given: Caller is not the "owner".
         vm.assume(caller != users.owner);
 
@@ -33,7 +33,19 @@ contract SetMerkleRoot_Redeemer_Fuzz_Test is Redeemer_Fuzz_Test {
         redeemer.setMerkleRoot(newMerkleRoot);
     }
 
-    function testFuzz_Success_SetMerkleRoot(bytes32 newMerkleRoot) public {
+    function testFuzz_Revert_setMerkleRoot_InvalidRoot(bytes32 newMerkleRoot) public {
+        // Given: Root is already set.
+        vm.prank(users.owner);
+        redeemer.setMerkleRoot(newMerkleRoot);
+
+        // When: Caller calls "setMerkleRoot".
+        // Then: Transaction should revert with "UNAUTHORIZED".
+        vm.prank(users.owner);
+        vm.expectRevert(Redeemer.InvalidRoot.selector);
+        redeemer.setMerkleRoot(newMerkleRoot);
+    }
+
+    function testFuzz_Success_setMerkleRoot(bytes32 newMerkleRoot) public {
         // Given: Caller is the "owner".
         // When: Caller calls "setMerkleRoot".
         // Then: correct event is emitted.
@@ -43,6 +55,7 @@ contract SetMerkleRoot_Redeemer_Fuzz_Test is Redeemer_Fuzz_Test {
         redeemer.setMerkleRoot(newMerkleRoot);
 
         // And: New merkle root is set.
+        assertTrue(redeemer.isRoot(newMerkleRoot));
         assertEq(redeemer.merkleRoot(), newMerkleRoot);
     }
 }
