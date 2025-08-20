@@ -54,12 +54,14 @@ abstract contract SafeTransactionBuilder {
      * @param safe The contract address of the Safe that will send the transactions.
      * @return data The encoded data.
      */
-    function createBatchedData(address safe) public view returns (bytes memory data) {
+    function createBatchedData(address safe) public returns (bytes memory data) {
         bytes[] memory encodedTxs_ = encodedTxs[safe];
         uint256 length = encodedTxs_.length;
         for (uint256 i; i < length; ++i) {
             data = bytes.concat(data, encodedTxs_[i]);
         }
         data = abi.encodeWithSignature("multiSend(bytes)", data);
+
+        delete encodedTxs[safe];
     }
 }

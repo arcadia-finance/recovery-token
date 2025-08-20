@@ -12,16 +12,34 @@ contract BatchMint is Base_Script {
     using stdJson for string;
 
     address internal SAFE = Safes.OWNER;
+    uint256 internal constant BATCH_SIZE = 178;
 
     function run() external {
         (uint256[] memory amounts, address[] memory tos) = getMintData();
 
-        // Mint Recovery Tokens.
-        addToBatch(SAFE, address(recoveryController), abi.encodeCall(recoveryController.batchMint, (tos, amounts)));
+        // Split arrays in smaller batches to sign in multiple txs.
+        uint256 length;
+        uint256[] memory amounts_;
+        address[] memory tos_;
+        for (uint256 i; i < amounts.length; i += BATCH_SIZE) {
+            length = i + BATCH_SIZE > amounts.length ? amounts.length - i : BATCH_SIZE;
+            emit log_named_uint("length", length);
 
-        // Create and write away batched transaction data to be signed with Safe.
-        bytes memory data = createBatchedData(SAFE);
-        vm.writeLine(PATH, vm.toString(data));
+            amounts_ = new uint256[](length);
+            tos_ = new address[](length);
+
+            for (uint256 j; j < length; j++) {
+                amounts_[j] = amounts[i + j];
+                tos_[j] = tos[i + j];
+            }
+
+            addToBatch(
+                SAFE, address(recoveryController), abi.encodeCall(recoveryController.batchMint, (tos_, amounts_))
+            );
+
+            // Create and write away batched transaction data to be signed with Safe.
+            vm.writeLine(PATH, vm.toString(createBatchedData(SAFE)));
+        }
     }
 
     function getMintData() internal view returns (uint256[] memory amounts, address[] memory tos) {
